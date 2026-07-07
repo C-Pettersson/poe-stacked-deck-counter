@@ -41,6 +41,7 @@ import type {
 } from "../shared/types.js";
 import { CurrencyAmount } from "./CurrencyAmount.js";
 import stackedDeckLogo from "./assets/stacked-deck-logo.png";
+import { STACKED_DECK_ICON } from "./currencyAssets.js";
 import {
   DEFAULT_DATA_SORT,
   getNextDataSort,
@@ -91,14 +92,85 @@ export function App(): ReactElement {
 
   useEffect(() => {
     const unsubscribe = window.poeDeck.onScanProgress(setScanProgress);
+    const unsubscribeAutoScanResult = window.poeDeck.onAutoScanResult((result) => {
+      setScanResult(result);
+      setSelectedSessionId(null);
+      setNotice(createScanNotice(result, "Auto scan found"));
+    });
+    const unsubscribeAutoScanError = window.poeDeck.onAutoScanError((message) => {
+      setNotice(`Automatic scan failed: ${message}`);
+    });
+    let isMounted = true;
+
     void window.poeDeck.getAppInfo().then(setAppInfo).catch(() => undefined);
     void window.poeDeck.loadSettings().then((loaded) => {
+      if (!isMounted) {
+        return;
+      }
+
       setSettings(loaded);
       void loadPrices(loaded.selectedLeagueId, false);
     });
 
-    return unsubscribe;
+    return () => {
+      isMounted = false;
+      unsubscribe();
+      unsubscribeAutoScanResult();
+      unsubscribeAutoScanError();
+      void window.poeDeck.stopAutoScan().catch(() => undefined);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!settings) {
+      return;
+    }
+
+    let isCurrent = true;
+
+    void window.poeDeck
+      .loadCachedScan(settings.logPath, settings)
+      .then((cachedResult) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        setScanResult(cachedResult);
+        setSelectedSessionId(null);
+        if (cachedResult) {
+          setNotice(createScanNotice(cachedResult, "Restored"));
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setScanResult(null);
+          setSelectedSessionId(null);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [settings?.logPath]);
+
+  useEffect(() => {
+    if (!settings) {
+      return;
+    }
+
+    let isCurrent = true;
+
+    void window.poeDeck.configureAutoScan(settings.logPath, settings).catch((error) => {
+      if (isCurrent && settings.autoScanEnabled) {
+        setNotice(error instanceof Error ? error.message : "Automatic scan setup failed.");
+      }
+    });
+
+    return () => {
+      isCurrent = false;
+      void window.poeDeck.stopAutoScan().catch(() => undefined);
+    };
+  }, [settings?.autoScanEnabled, settings?.logPath, settings?.profitFilters, settings?.sessionLeagueOverrides]);
 
   const sessions = useMemo(
     () =>
@@ -147,7 +219,7 @@ export function App(): ReactElement {
       const result = await window.poeDeck.scanLog(settings.logPath, settings);
       setScanResult(result);
       setSelectedSessionId(null);
-      setNotice(`Found ${result.draws.length} card draws in ${result.sessions.length} sessions.`);
+      setNotice(createScanNotice(result, "Found"));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Scan failed.");
     } finally {
@@ -211,6 +283,14 @@ export function App(): ReactElement {
     }
 
     await updateSettings({ ...settings, profitFilters });
+  }
+
+  async function changeAutoScanEnabled(autoScanEnabled: boolean): Promise<void> {
+    if (!settings) {
+      return;
+    }
+
+    await updateSettings({ ...settings, autoScanEnabled });
   }
 
   async function changeSessionLeague(session: DeckSession, leagueId: string): Promise<void> {
@@ -391,6 +471,7 @@ export function App(): ReactElement {
           onCheckForUpdate={() => void checkForAppUpdate()}
           onChooseLog={() => void chooseLogFile()}
           onOpen={(url) => void window.poeDeck.openExternal(url)}
+          onAutoScanChange={(autoScanEnabled) => void changeAutoScanEnabled(autoScanEnabled)}
           onProfitFiltersChange={(profitFilters) => void changeProfitFilters(profitFilters)}
         />
       ) : null}
@@ -584,7 +665,7 @@ function SessionsTab(props: {
             <div className="card-grid">
               {props.selectedSession.cards.map((card) => (
                 <article className="div-card" key={card.name}>
-                  <CardIcon icon={card.icon} />
+                  <CardIcon />
                   <div>
                     <h3>{card.name}</h3>
                     <p>{card.count} opened</p>
@@ -612,21 +693,20 @@ function SessionsTab(props: {
   );
 }
 
-function CardIcon({ icon }: { icon?: string }): ReactElement {
-  const [failedIcon, setFailedIcon] = useState<string | null>(null);
-  const showImage = icon && failedIcon !== icon;
+function CardIcon(): ReactElement {
+  const [failedIcon, setFailedIcon] = useState(false);
 
-  if (showImage) {
+  if (!failedIcon) {
     return (
-      <div className="card-icon has-image">
-        <img src={icon} alt="" onError={() => setFailedIcon(icon)} />
+      <div className="card-icon has-image stacked-deck-icon">
+        <img src={STACKED_DECK_ICON} alt="" onError={() => setFailedIcon(true)} />
       </div>
     );
   }
 
   return (
     <div className="card-icon fallback" aria-hidden="true">
-      D
+      SD
     </div>
   );
 }
@@ -791,6 +871,7 @@ function SettingsTab(props: {
   onCheckForUpdate: () => void;
   onChooseLog: () => void;
   onOpen: (url: string) => void;
+  onAutoScanChange: (enabled: boolean) => void;
   onProfitFiltersChange: (profitFilters: Settings["profitFilters"]) => void;
 }): ReactElement {
   const selectedLeague = getLeagueById(props.settings.selectedLeagueId);
@@ -820,6 +901,14 @@ function SettingsTab(props: {
           <FolderOpen size={17} />
           <span>Select File</span>
         </button>
+        <label className="field-shell checkbox-shell">
+          <span>Automatic scanning</span>
+          <input
+            type="checkbox"
+            checked={props.settings.autoScanEnabled}
+            onChange={(event) => props.onAutoScanChange(event.target.checked)}
+          />
+        </label>
       </article>
       <article className="settings-card">
         <h2>League Dates</h2>
@@ -949,6 +1038,26 @@ function summarizeSessions(sessions: DeckSession[]): { sessions: number; cards: 
     }),
     { sessions: 0, cards: 0, value: 0, cost: 0, profit: 0 }
   );
+}
+
+function createScanNotice(result: ScanResult, prefix: string): string {
+  const modeLabel = getScanModeLabel(result);
+  return `${prefix} ${result.draws.length} card draws in ${result.sessions.length} sessions${modeLabel ? ` (${modeLabel})` : ""}.`;
+}
+
+function getScanModeLabel(result: ScanResult): string | null {
+  switch (result.scanMode) {
+    case "cached":
+      return "cache reused";
+    case "restored":
+      return "from saved cache";
+    case "incremental":
+      return `${(result.bytesScanned ?? 0).toLocaleString()} new bytes`;
+    case "full":
+      return "full scan";
+    default:
+      return null;
+  }
 }
 
 function createLeagueFilterId(leagueId: string): DataLeagueFilterId {

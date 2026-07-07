@@ -1,7 +1,8 @@
 import type { ReactElement } from "react";
 import { formatCurrencyValue, formatSignedCurrencyValue } from "../shared/currencyFormat.js";
-import { getDivineChaosValue, resolveCurrencyIcon } from "../shared/currencyIcons.js";
+import { getDivineChaosValue } from "../shared/currencyIcons.js";
 import type { CurrencyMode, PriceSnapshot } from "../shared/types.js";
+import { resolveBundledCurrencyIcon } from "./currencyAssets.js";
 
 export function CurrencyAmount({
   className,
@@ -19,7 +20,7 @@ export function CurrencyAmount({
   const formatted = signed
     ? formatSignedCurrencyValue(valueChaos, { mode, divineChaosValue: getDivineChaosValue(snapshot) })
     : formatCurrencyValue(valueChaos, { mode, divineChaosValue: getDivineChaosValue(snapshot) });
-  const icon = formatted.denomination ? resolveCurrencyIcon(snapshot, formatted.denomination) : null;
+  const icon = formatted.denomination ? resolveBundledCurrencyIcon(snapshot, formatted.denomination) : null;
   const classes = ["currency-amount", formatted.denomination ? `currency-${formatted.denomination}` : "placeholder", className]
     .filter(Boolean)
     .join(" ");

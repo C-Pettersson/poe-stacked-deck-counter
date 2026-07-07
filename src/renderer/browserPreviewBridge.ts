@@ -19,6 +19,7 @@ const previewSettings: Settings = {
   logPath: "Browser preview sample data",
   selectedLeagueId: "mirage",
   currencyMode: "auto",
+  autoScanEnabled: false,
   profitFilters: DEFAULT_PROFIT_FILTERS,
   sessionLeagueOverrides: {}
 };
@@ -70,6 +71,8 @@ const previewDraws: ClientLogDraw[] = [
 ];
 
 const progressListeners = new Set<(progress: ScanProgress) => void>();
+const autoScanResultListeners = new Set<(result: ScanResult) => void>();
+const autoScanErrorListeners = new Set<(message: string) => void>();
 
 export function installBrowserPreviewBridge(): void {
   if ("poeDeck" in window && window.poeDeck) {
@@ -77,6 +80,7 @@ export function installBrowserPreviewBridge(): void {
   }
 
   let settings = { ...previewSettings };
+  let autoScanTimer: number | null = null;
 
   window.poeDeck = {
     loadSettings: async () => {
@@ -106,6 +110,42 @@ export function installBrowserPreviewBridge(): void {
 
       return result;
     },
+    loadCachedScan: async (filePath, currentSettings) => ({
+      ...createFallbackScanResult(filePath, currentSettings),
+      scanMode: "restored",
+      bytesScanned: 0,
+      cachedBytes: 2400
+    }),
+    configureAutoScan: async (filePath, currentSettings) => {
+      if (autoScanTimer !== null) {
+        window.clearTimeout(autoScanTimer);
+        autoScanTimer = null;
+      }
+
+      if (!currentSettings.autoScanEnabled) {
+        return false;
+      }
+
+      autoScanTimer = window.setTimeout(() => {
+        autoScanTimer = null;
+        emitAutoScanResult({
+          ...createFallbackScanResult(filePath, currentSettings),
+          scanMode: "cached",
+          bytesScanned: 0,
+          cachedBytes: 2400
+        });
+      }, 300);
+
+      return true;
+    },
+    stopAutoScan: async () => {
+      if (autoScanTimer !== null) {
+        window.clearTimeout(autoScanTimer);
+        autoScanTimer = null;
+      }
+
+      return true;
+    },
     getPrices: async (leagueId, forceRefresh = false) =>
       getPreviewJson<PriceSnapshot>(`/prices?leagueId=${encodeURIComponent(leagueId)}&forceRefresh=${forceRefresh}`).catch(
         () => createPreviewSnapshot(leagueId)
@@ -132,6 +172,14 @@ export function installBrowserPreviewBridge(): void {
     onScanProgress: (listener) => {
       progressListeners.add(listener);
       return () => progressListeners.delete(listener);
+    },
+    onAutoScanResult: (listener) => {
+      autoScanResultListeners.add(listener);
+      return () => autoScanResultListeners.delete(listener);
+    },
+    onAutoScanError: (listener) => {
+      autoScanErrorListeners.add(listener);
+      return () => autoScanErrorListeners.delete(listener);
     }
   };
 }
@@ -153,6 +201,7 @@ function mergeSettings(serverSettings: Settings, savedSettings: Partial<Settings
         ? savedSettings.logPath
         : serverSettings.logPath,
     currencyMode: savedSettings.currencyMode === "chaos" ? "chaos" : serverSettings.currencyMode ?? previewSettings.currencyMode,
+    autoScanEnabled: savedSettings.autoScanEnabled === true,
     profitFilters: normalizeProfitFilters(savedSettings.profitFilters ?? serverSettings.profitFilters),
     sessionLeagueOverrides: savedSettings.sessionLeagueOverrides ?? serverSettings.sessionLeagueOverrides
   };
@@ -172,6 +221,9 @@ function createFallbackScanResult(filePath: string, currentSettings: Settings): 
     filePath,
     fileSize: 2400,
     scannedAt: new Date().toISOString(),
+    scanMode: "full",
+    bytesScanned: 2400,
+    cachedBytes: 0,
     draws: previewDraws,
     sessions: buildSessions(previewDraws, null, currentSettings.sessionLeagueOverrides, {
       profitFilters: currentSettings.profitFilters
@@ -208,6 +260,18 @@ async function readPreviewResponse<T>(response: Response): Promise<T> {
 function emitProgress(progress: ScanProgress): void {
   for (const listener of progressListeners) {
     listener(progress);
+  }
+}
+
+function emitAutoScanResult(result: ScanResult): void {
+  for (const listener of autoScanResultListeners) {
+    listener(result);
+  }
+}
+
+function emitAutoScanError(message: string): void {
+  for (const listener of autoScanErrorListeners) {
+    listener(message);
   }
 }
 
