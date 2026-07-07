@@ -114,6 +114,7 @@ function createPreviewScanResult(filePath: string, result: ClientLogScan, settin
     draws: result.draws,
     sessions: buildSessions(result.draws, null, settings.sessionLeagueOverrides, {
       fixedStackedDeckPriceChaos: settings.fixedStackedDeckPriceChaos,
+      pricingLeagueId: settings.selectedLeagueId,
       profitFilters: settings.profitFilters
     })
   };

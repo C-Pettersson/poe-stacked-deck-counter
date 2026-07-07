@@ -287,6 +287,7 @@ function createFallbackScanResult(filePath: string, currentSettings: Settings): 
     draws: previewDraws,
     sessions: buildSessions(previewDraws, null, currentSettings.sessionLeagueOverrides, {
       fixedStackedDeckPriceChaos: currentSettings.fixedStackedDeckPriceChaos,
+      pricingLeagueId: currentSettings.selectedLeagueId,
       profitFilters: currentSettings.profitFilters
     })
   };

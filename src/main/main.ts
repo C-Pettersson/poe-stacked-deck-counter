@@ -175,6 +175,7 @@ function createScanResult(filePath: string, result: ClientLogScan, settings: Set
     draws: result.draws,
     sessions: buildSessions(result.draws, null, settings.sessionLeagueOverrides, {
       fixedStackedDeckPriceChaos: settings.fixedStackedDeckPriceChaos,
+      pricingLeagueId: settings.selectedLeagueId,
       profitFilters: settings.profitFilters
     })
   };

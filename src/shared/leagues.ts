@@ -108,6 +108,10 @@ export function getLeagueById(id: string): LeagueInfo {
   return CHALLENGE_LEAGUES.find((league) => league.id === id) ?? CHALLENGE_LEAGUES[0];
 }
 
+export function isKnownLeagueId(id: unknown): id is string {
+  return typeof id === "string" && CHALLENGE_LEAGUES.some((league) => league.id === id);
+}
+
 export function getDefaultLeague(now = new Date()): LeagueInfo {
   return matchLeagueByDate(now) ?? CHALLENGE_LEAGUES[0];
 }
@@ -124,7 +128,7 @@ export function matchLeagueByDate(value: Date | string): LeagueInfo | null {
 
       const startsAt = new Date(league.startsAt).getTime();
       const endsAt = league.endsAt ? new Date(league.endsAt).getTime() : Number.POSITIVE_INFINITY;
-      return time >= startsAt && time <= endsAt;
+      return time >= startsAt && time < endsAt;
     }) ?? null
   );
 }

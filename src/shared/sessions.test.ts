@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSessions } from "./sessions.js";
+import { buildSessions, updateSessionLeagueOverrides } from "./sessions.js";
 import type { ClientLogDraw, PriceSnapshot } from "./types.js";
 
 describe("buildSessions", () => {
@@ -32,6 +32,57 @@ describe("buildSessions", () => {
     expect(sessions[0].leagueId).toBe("keepers");
     expect(sessions[0].cards[0].priceChaos).toBe(1);
     expect(sessions[0].profitChaos).toBe(0);
+  });
+
+  it("applies a manual session league override", () => {
+    const sessionId = "session-2025-11-01T12-07-45Z-1";
+    const sessions = buildSessions([makeDraw("2025-11-01T12:07:45Z", "The Lover")], null, {
+      [sessionId]: "mirage"
+    });
+
+    expect(sessions[0]).toMatchObject({
+      id: sessionId,
+      leagueId: "mirage",
+      leagueName: "Mirage",
+      source: "manual"
+    });
+  });
+
+  it("keeps the auto league source when an override matches the detected league", () => {
+    const sessionId = "session-2025-11-01T12-07-45Z-1";
+    const sessions = buildSessions([makeDraw("2025-11-01T12:07:45Z", "The Lover")], null, {
+      [sessionId]: "keepers"
+    });
+
+    expect(sessions[0]).toMatchObject({
+      leagueId: "keepers",
+      source: "auto"
+    });
+  });
+
+  it("ignores invalid persisted session league overrides", () => {
+    const sessionId = "session-2025-11-01T12-07-45Z-1";
+    const sessions = buildSessions([makeDraw("2025-11-01T12:07:45Z", "The Lover")], null, {
+      [sessionId]: "missing-league"
+    });
+
+    expect(sessions[0]).toMatchObject({
+      leagueId: "keepers",
+      source: "auto"
+    });
+  });
+
+  it("updates session league overrides by session id and clears auto matches", () => {
+    const session = {
+      id: "session-2025-11-01T12-07-45Z-1",
+      startAt: "2025-11-01T12:07:45Z"
+    };
+
+    const overridden = updateSessionLeagueOverrides({}, session, "mirage");
+    expect(overridden).toEqual({ [session.id]: "mirage" });
+
+    const restoredAuto = updateSessionLeagueOverrides(overridden, session, "keepers");
+    expect(restoredAuto).toEqual({});
   });
 
   it("uses a fixed stacked deck price when one is configured", () => {

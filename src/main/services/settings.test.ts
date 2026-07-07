@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -41,6 +41,29 @@ describe("settings", () => {
 
     expect(savedSettings.fixedStackedDeckPriceChaos).toBe(1.7);
     expect(loadedSettings.fixedStackedDeckPriceChaos).toBe(1.7);
+  });
+
+  it("normalizes unknown saved league ids", async () => {
+    const userDataPath = await createTempDir();
+    await writeFile(
+      path.join(userDataPath, "settings.json"),
+      `${JSON.stringify({
+        ...defaultSettings(),
+        selectedLeagueId: "missing-league",
+        sessionLeagueOverrides: {
+          "session-valid": "keepers",
+          "session-invalid": "missing-league"
+        }
+      })}\n`,
+      "utf8"
+    );
+
+    const loadedSettings = await loadSettings(userDataPath);
+
+    expect(loadedSettings.selectedLeagueId).not.toBe("missing-league");
+    expect(loadedSettings.sessionLeagueOverrides).toEqual({
+      "session-valid": "keepers"
+    });
   });
 });
 

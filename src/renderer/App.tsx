@@ -21,7 +21,7 @@ import {
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { CHALLENGE_LEAGUES, LEAGUE_SOURCE_URL, getLeagueById } from "../shared/leagues.js";
 import { formatDateRange, formatDateTime, formatDropRate, formatPercent } from "../shared/format.js";
-import { buildSessions, rollupCards } from "../shared/sessions.js";
+import { buildSessions, rollupCards, updateSessionLeagueOverrides } from "../shared/sessions.js";
 import {
   createCsv,
   createDiscordShare,
@@ -317,18 +317,26 @@ export function App(): ReactElement {
     await updateSettings({ ...settings, fixedStackedDeckPriceChaos });
   }
 
-  async function changeSessionLeague(session: DeckSession, leagueId: string): Promise<void> {
+  async function changeSessionLeague(sessionId: string, leagueId: string): Promise<void> {
     if (!settings) {
+      return;
+    }
+
+    const session = sessions.find((candidate) => candidate.id === sessionId);
+    if (!session) {
+      return;
+    }
+
+    const sessionLeagueOverrides = updateSessionLeagueOverrides(settings.sessionLeagueOverrides, session, leagueId);
+    if (sessionLeagueOverrides === settings.sessionLeagueOverrides) {
       return;
     }
 
     const nextSettings = {
       ...settings,
-      sessionLeagueOverrides: {
-        ...settings.sessionLeagueOverrides,
-        [session.id]: leagueId
-      }
+      sessionLeagueOverrides
     };
+    setSelectedSessionId(sessionId);
     await updateSettings(nextSettings);
   }
 
@@ -554,7 +562,7 @@ function SessionsTab(props: {
   sessions: DeckSession[];
   selectedSession: DeckSession | null;
   onSelect: (id: string) => void;
-  onLeagueChange: (session: DeckSession, leagueId: string) => void;
+  onLeagueChange: (sessionId: string, leagueId: string) => void;
   onDiscord: (session: DeckSession) => void;
   onReddit: (session: DeckSession) => void;
   onCopyPoeHow: (session: DeckSession) => void;
@@ -612,7 +620,7 @@ function SessionsTab(props: {
                 <span>{props.selectedSession.source === "auto" ? "Auto league" : "Session league"}</span>
                 <select
                   value={props.selectedSession.leagueId}
-                  onChange={(event) => props.onLeagueChange(props.selectedSession!, event.target.value)}
+                  onChange={(event) => props.onLeagueChange(props.selectedSession!.id, event.target.value)}
                 >
                   {CHALLENGE_LEAGUES.map((league) => (
                     <option value={league.id} key={league.id}>

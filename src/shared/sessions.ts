@@ -1,4 +1,4 @@
-import { getLeagueById, matchLeagueByDate } from "./leagues.js";
+import { getLeagueById, isKnownLeagueId, matchLeagueByDate } from "./leagues.js";
 import { getCardPrice } from "./pricing.js";
 import { DEFAULT_PROFIT_FILTERS, getIncludedValueChaos, hasCardPriceConfidence } from "./profitFilters.js";
 import type { ClientLogDraw, DeckSession, PriceSnapshot, ProfitFilters, SessionCard } from "./types.js";
@@ -39,9 +39,11 @@ export function buildSessions(
     const endAt = group[group.length - 1].timestamp;
     const autoLeague = matchLeagueByDate(startAt) ?? getLeagueById("standard");
     const temporaryId = createSessionId(startAt, index);
-    const overrideLeague = overrides[temporaryId] ? getLeagueById(overrides[temporaryId]) : null;
-    const league = overrideLeague ?? autoLeague;
-    const source = overrideLeague ? "manual" : "auto";
+    const overrideLeagueId = overrides[temporaryId];
+    const overrideLeague = isKnownLeagueId(overrideLeagueId) ? getLeagueById(overrideLeagueId) : null;
+    const hasManualOverride = overrideLeague !== null && overrideLeague.id !== autoLeague.id;
+    const league = hasManualOverride ? overrideLeague : autoLeague;
+    const source = hasManualOverride ? "manual" : "auto";
     const pricingLeagueId = options.pricingLeagueId ?? league.id;
     const profitFilters = options.profitFilters ?? DEFAULT_PROFIT_FILTERS;
     const priced = selectSnapshot(priceSnapshot, pricingLeagueId);
@@ -70,6 +72,27 @@ export function buildSessions(
       missingPrices
     };
   });
+}
+
+export function updateSessionLeagueOverrides(
+  overrides: Record<string, string>,
+  session: Pick<DeckSession, "id" | "startAt">,
+  leagueId: string
+): Record<string, string> {
+  if (!isKnownLeagueId(leagueId)) {
+    return overrides;
+  }
+
+  const autoLeague = matchLeagueByDate(session.startAt) ?? getLeagueById("standard");
+  const nextOverrides = { ...overrides };
+
+  if (leagueId === autoLeague.id) {
+    delete nextOverrides[session.id];
+  } else {
+    nextOverrides[session.id] = leagueId;
+  }
+
+  return nextOverrides;
 }
 
 function selectSnapshot(source: PriceSource, leagueId: string): PriceSnapshot | null {

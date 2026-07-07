@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_CURRENCY_MODE } from "../../shared/currencyFormat.js";
-import { getDefaultLeague } from "../../shared/leagues.js";
+import { getDefaultLeague, isKnownLeagueId } from "../../shared/leagues.js";
 import { DEFAULT_PROFIT_FILTERS, normalizeProfitFilters } from "../../shared/profitFilters.js";
 import type { Settings } from "../../shared/types.js";
 
@@ -28,11 +28,12 @@ export async function loadSettings(userDataPath: string): Promise<Settings> {
     return {
       ...defaultSettings(),
       ...saved,
+      selectedLeagueId: normalizeLeagueId(saved.selectedLeagueId),
       currencyMode: saved.currencyMode === "chaos" ? "chaos" : DEFAULT_CURRENCY_MODE,
       autoScanEnabled: saved.autoScanEnabled === true,
       fixedStackedDeckPriceChaos: normalizeOptionalChaosPrice(saved.fixedStackedDeckPriceChaos),
       profitFilters: normalizeProfitFilters(saved.profitFilters),
-      sessionLeagueOverrides: saved.sessionLeagueOverrides ?? {}
+      sessionLeagueOverrides: normalizeSessionLeagueOverrides(saved.sessionLeagueOverrides)
     };
   } catch {
     return defaultSettings();
@@ -51,4 +52,18 @@ function getSettingsPath(userDataPath: string): string {
 
 function normalizeOptionalChaosPrice(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function normalizeLeagueId(value: unknown): string {
+  return isKnownLeagueId(value) ? value : defaultSettings().selectedLeagueId;
+}
+
+function normalizeSessionLeagueOverrides(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string" && isKnownLeagueId(entry[1]))
+  );
 }
