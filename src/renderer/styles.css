@@ -140,6 +140,21 @@ p {
   background: #14725b;
 }
 
+.primary-button.is-scanning,
+.primary-button.is-scanning:disabled,
+.primary-button.is-scanning:hover {
+  border-color: #39b995;
+  background: #168066;
+  box-shadow: 0 0 0 1px rgba(101, 217, 173, 0.22), 0 0 24px rgba(17, 96, 77, 0.35);
+  color: #ffffff;
+  cursor: wait;
+  opacity: 1;
+}
+
+.spin-icon {
+  animation: scan-spin 900ms linear infinite;
+}
+
 .icon-button {
   background: #1d2630;
 }
@@ -239,25 +254,73 @@ p {
 
 .scan-progress {
   position: relative;
-  height: 32px;
-  border: 1px solid #2d4d4a;
+  height: 42px;
+  border: 1px solid #28715f;
   border-radius: 8px;
   overflow: hidden;
-  background: #0f1819;
+  background: #0d1818;
+  box-shadow: 0 0 0 1px rgba(101, 217, 173, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   margin-bottom: 16px;
 }
 
-.scan-progress div {
+.scan-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
   height: 100%;
-  background: #11604d;
+  min-width: 8px;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.16) 0,
+      rgba(255, 255, 255, 0.16) 8px,
+      transparent 8px,
+      transparent 16px
+    ),
+    linear-gradient(90deg, #11604d, #21a584);
+  background-size: 28px 28px, 100% 100%;
+  transition: width 160ms ease;
+  animation: scan-stripes 900ms linear infinite;
 }
 
-.scan-progress span {
+.scan-progress.is-indeterminate .scan-progress-fill {
+  width: 38%;
+  min-width: 140px;
+  animation: scan-indeterminate 1200ms ease-in-out infinite, scan-stripes 900ms linear infinite;
+}
+
+.scan-progress-label {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
+  padding: 0 14px;
+  color: #f4f7f8;
+  font-weight: 700;
   font-size: 13px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+  white-space: nowrap;
+}
+
+@keyframes scan-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes scan-stripes {
+  to {
+    background-position: 28px 0, 0 0;
+  }
+}
+
+@keyframes scan-indeterminate {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(320%);
+  }
 }
 
 .session-layout {

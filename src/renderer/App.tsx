@@ -12,6 +12,7 @@ import {
   ExternalLink,
   FileSearch,
   FolderOpen,
+  LoaderCircle,
   RefreshCw,
   Save,
   Settings as SettingsIcon,
@@ -250,9 +251,19 @@ export function App(): ReactElement {
             <RefreshCw size={18} />
             <span>Refresh</span>
           </button>
-          <button className="primary-button" type="button" onClick={() => void scanLog()} disabled={isScanning}>
-            <FileSearch size={18} />
-            <span>{isScanning ? "Scanning" : "Scan Log"}</span>
+          <button
+            aria-busy={isScanning}
+            className={isScanning ? "primary-button is-scanning" : "primary-button"}
+            type="button"
+            onClick={() => void scanLog()}
+            disabled={isScanning}
+          >
+            {isScanning ? (
+              <LoaderCircle aria-hidden="true" className="spin-icon" size={18} />
+            ) : (
+              <FileSearch size={18} />
+            )}
+            <span>{isScanning ? "Scanning..." : "Scan Log"}</span>
           </button>
         </div>
       </header>
@@ -332,13 +343,23 @@ function Metric(props: { label: string; value: string; tone?: "good" | "bad" }):
 
 function ScanProgressBar({ progress }: { progress: ScanProgress }): ReactElement {
   const percent = progress.totalBytes > 0 ? Math.min(100, (progress.bytesRead / progress.totalBytes) * 100) : 0;
+  const hasMeasuredProgress = progress.totalBytes > 0 && percent > 0;
+  const progressLabel = hasMeasuredProgress
+    ? `${percent.toFixed(1)}% - ${progress.linesRead.toLocaleString()} lines - ${progress.drawsFound.toLocaleString()} draws`
+    : "Scanning log...";
 
   return (
-    <div className="scan-progress">
-      <div style={{ width: `${percent}%` }} />
-      <span>
-        {percent.toFixed(1)}% - {progress.linesRead.toLocaleString()} lines - {progress.drawsFound.toLocaleString()} draws
-      </span>
+    <div
+      aria-live="polite"
+      className={hasMeasuredProgress ? "scan-progress" : "scan-progress is-indeterminate"}
+      role="status"
+    >
+      <div
+        aria-hidden="true"
+        className="scan-progress-fill"
+        style={{ width: hasMeasuredProgress ? `${percent}%` : undefined }}
+      />
+      <span className="scan-progress-label">{progressLabel}</span>
     </div>
   );
 }
