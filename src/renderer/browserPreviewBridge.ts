@@ -8,6 +8,8 @@ const previewSettings: Settings = {
   sessionLeagueOverrides: {}
 };
 
+const PREVIEW_DIVINATION_ICON = "https://web.poecdn.com/image/Art/2DItems/Divination/InventoryIcon.png?scale=1&w=1&h=1";
+
 const previewDraws: ClientLogDraw[] = [
   {
     id: "preview-1",
@@ -211,7 +213,8 @@ function createPreviewSnapshot(leagueId: string): PriceSnapshot {
         name: "Emperor's Luck",
         detailsId: "emperors-luck",
         chaosValue: 0.3,
-        change7d: -2.1
+        change7d: -2.1,
+        icon: PREVIEW_DIVINATION_ICON
       },
       "the watcher": {
         id: "the-watcher",
@@ -225,14 +228,16 @@ function createPreviewSnapshot(leagueId: string): PriceSnapshot {
         name: "The Hoarder",
         detailsId: "the-hoarder",
         chaosValue: 8,
-        change7d: 4.7
+        change7d: 4.7,
+        icon: PREVIEW_DIVINATION_ICON
       },
       "the doctor": {
         id: "the-doctor",
         name: "The Doctor",
         detailsId: "the-doctor",
         chaosValue: 1260,
-        change7d: 8.2
+        change7d: 8.2,
+        icon: PREVIEW_DIVINATION_ICON
       },
       "the nurse": {
         id: "the-nurse",

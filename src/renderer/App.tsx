@@ -446,7 +446,7 @@ function SessionsTab(props: {
             <div className="card-grid">
               {props.selectedSession.cards.map((card) => (
                 <article className="div-card" key={card.name}>
-                  <div className="card-icon">D</div>
+                  <CardIcon icon={card.icon} />
                   <div>
                     <h3>{card.name}</h3>
                     <p>{card.count} opened</p>
@@ -465,6 +465,25 @@ function SessionsTab(props: {
         )}
       </section>
     </section>
+  );
+}
+
+function CardIcon({ icon }: { icon?: string }): ReactElement {
+  const [failedIcon, setFailedIcon] = useState<string | null>(null);
+  const showImage = icon && failedIcon !== icon;
+
+  if (showImage) {
+    return (
+      <div className="card-icon has-image">
+        <img src={icon} alt="" onError={() => setFailedIcon(icon)} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="card-icon fallback" aria-hidden="true">
+      D
+    </div>
   );
 }
 
