@@ -60,7 +60,8 @@ select {
   background: #151c21;
 }
 
-input[type="number"] {
+input[type="number"],
+input[type="search"] {
   height: 40px;
   min-width: 170px;
   border: 1px solid #33424a;
@@ -202,6 +203,10 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+.compact-checkbox {
+  width: 150px;
 }
 
 .select-shell.compact select {
@@ -455,6 +460,19 @@ p {
   margin-top: 5px;
 }
 
+.detail-controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.deck-price-field input {
+  width: 118px;
+  min-width: 118px;
+}
+
 .detail-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(110px, 1fr));
@@ -480,6 +498,19 @@ p {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.card-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.card-search-field input {
+  width: min(320px, 100%);
 }
 
 .card-grid {
@@ -526,10 +557,45 @@ p {
   object-fit: contain;
 }
 
+.card-body {
+  min-width: 0;
+}
+
+.card-title-row,
+.data-card-name-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
 .div-card h3 {
+  min-width: 0;
   font-size: 16px;
   line-height: 1.25;
   overflow-wrap: anywhere;
+}
+
+.card-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.card-icon-button {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  color: #aebec6;
+}
+
+.card-icon-button.active {
+  border-color: #bf8f39;
+  color: #f0c56c;
+  background: #2b2418;
 }
 
 .div-card p,
@@ -545,6 +611,16 @@ p {
 
 .div-card small {
   grid-column: 1 / -1;
+}
+
+.card-grid-empty {
+  grid-column: 1 / -1;
+  min-height: 96px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed #40515a;
+  border-radius: 8px;
+  color: #9fb0b8;
 }
 
 .value-filter-note {
@@ -585,6 +661,12 @@ td {
 
 th:first-child,
 td:first-child {
+  width: 92px;
+  text-align: center;
+}
+
+th:nth-child(2),
+td:nth-child(2) {
   text-align: left;
 }
 
@@ -627,7 +709,7 @@ th {
   color: #f0c56c;
 }
 
-th:first-child .table-sort-button {
+th:nth-child(2) .table-sort-button {
   justify-content: flex-start;
 }
 
@@ -635,6 +717,45 @@ td.table-empty {
   height: 96px;
   color: #9fb0b8;
   text-align: center;
+}
+
+.data-card-cell {
+  min-width: 260px;
+  display: grid;
+  gap: 3px;
+  padding: 6px 0;
+  white-space: normal;
+}
+
+.data-card-name-row {
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.data-card-name-row span {
+  min-width: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.data-card-cell small {
+  color: #aebec6;
+  font-size: 12px;
+}
+
+.actions-column {
+  height: 44px;
+  padding: 0 12px;
+  color: #aebec6;
+  font-weight: 700;
+}
+
+.actions-cell {
+  white-space: nowrap;
+}
+
+.actions-cell .card-icon-button + .card-icon-button {
+  margin-left: 4px;
 }
 
 .settings-grid {
@@ -709,6 +830,10 @@ td.table-empty {
   }
 
   .data-actions {
+    justify-content: flex-start;
+  }
+
+  .detail-controls {
     justify-content: flex-start;
   }
 

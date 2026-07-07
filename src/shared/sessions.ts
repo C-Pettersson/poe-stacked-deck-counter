@@ -1,5 +1,5 @@
 import { getLeagueById, isKnownLeagueId, matchLeagueByDate } from "./leagues.js";
-import { getCardPrice } from "./pricing.js";
+import { getCardPrice, normalizeCardKey } from "./pricing.js";
 import { DEFAULT_PROFIT_FILTERS, getCardPriceConfidence, getIncludedValueChaos } from "./profitFilters.js";
 import type { ClientLogDraw, DeckSession, PriceSnapshot, ProfitFilters, SessionCard } from "./types.js";
 
@@ -10,6 +10,8 @@ interface BuildSessionsOptions {
   pricingLeagueId?: string;
   fixedStackedDeckPriceChaos?: number | null;
   profitFilters?: ProfitFilters;
+  ignoredCardNames?: string[];
+  sessionDeckPriceOverrides?: Record<string, number>;
 }
 
 export function buildSessions(
@@ -46,10 +48,16 @@ export function buildSessions(
     const source = hasManualOverride ? "manual" : "auto";
     const pricingLeagueId = options.pricingLeagueId ?? league.id;
     const profitFilters = options.profitFilters ?? DEFAULT_PROFIT_FILTERS;
+    const ignoredCardKeys = buildIgnoredCardKeys(options.ignoredCardNames);
     const priced = selectSnapshot(priceSnapshot, pricingLeagueId);
-    const cards = buildSessionCards(group, priced, profitFilters);
+    const cards = buildSessionCards(group, priced, profitFilters, ignoredCardKeys);
     const totalValueChaos = cards.reduce((total, card) => total + (card.includedValueChaos ?? 0), 0);
-    const stackedDeckCostChaos = getStackedDeckPriceChaos(priced, options.fixedStackedDeckPriceChaos) * group.length;
+    const stackedDeckCostChaos =
+      getStackedDeckPriceChaos(
+        priced,
+        options.fixedStackedDeckPriceChaos,
+        options.sessionDeckPriceOverrides?.[temporaryId]
+      ) * group.length;
     const missingPrices = cards.filter((card) => card.priceChaos === null).length;
 
     return {
@@ -111,7 +119,15 @@ function isPriceSnapshot(source: PriceSnapshot | Record<string, PriceSnapshot>):
   return "leagueId" in source && "cards" in source && "fetchedAt" in source;
 }
 
-function getStackedDeckPriceChaos(snapshot: PriceSnapshot | null, fixedPriceChaos: number | null | undefined): number {
+function getStackedDeckPriceChaos(
+  snapshot: PriceSnapshot | null,
+  fixedPriceChaos: number | null | undefined,
+  sessionPriceChaos: number | null | undefined
+): number {
+  if (typeof sessionPriceChaos === "number" && Number.isFinite(sessionPriceChaos) && sessionPriceChaos >= 0) {
+    return sessionPriceChaos;
+  }
+
   if (typeof fixedPriceChaos === "number" && Number.isFinite(fixedPriceChaos) && fixedPriceChaos >= 0) {
     return fixedPriceChaos;
   }
@@ -139,6 +155,11 @@ export function rollupCards(sessions: DeckSession[]): SessionCard[] {
         existing.totalChaos !== null || card.totalChaos !== null
           ? (existing.totalChaos ?? 0) + (card.totalChaos ?? 0)
           : null;
+      existing.includedValueChaos = sumNullableValues(existing.includedValueChaos, card.includedValueChaos);
+      existing.isValueIgnored = existing.isValueIgnored || card.isValueIgnored;
+      if (card.exclusionReason === "manual-ignore") {
+        existing.exclusionReason = "manual-ignore";
+      }
     }
   }
 
@@ -148,7 +169,8 @@ export function rollupCards(sessions: DeckSession[]): SessionCard[] {
 function buildSessionCards(
   draws: ClientLogDraw[],
   snapshot: PriceSnapshot | null,
-  profitFilters: ProfitFilters
+  profitFilters: ProfitFilters,
+  ignoredCardKeys: Set<string>
 ): SessionCard[] {
   const counts = new Map<string, number>();
 
@@ -163,7 +185,10 @@ function buildSessionCards(
       const totalChaos = price ? price.chaosValue * count : null;
       const priceConfidence = price ? getCardPriceConfidence(price) : undefined;
       const hasPriceConfidence = price ? priceConfidence === "high" : undefined;
-      const included = getIncludedValueChaos({ priceChaos, totalChaos, hasPriceConfidence, priceConfidence }, profitFilters);
+      const isValueIgnored = ignoredCardKeys.has(normalizeCardKey(name));
+      const included = isValueIgnored
+        ? { valueChaos: 0, reason: "manual-ignore" as const }
+        : getIncludedValueChaos({ priceChaos, totalChaos, hasPriceConfidence, priceConfidence }, profitFilters);
 
       return {
         name,
@@ -172,6 +197,7 @@ function buildSessionCards(
         totalChaos,
         includedValueChaos: included.valueChaos,
         exclusionReason: included.reason,
+        isValueIgnored,
         hasPriceConfidence,
         priceConfidence,
         priceSource: price?.source,
@@ -181,4 +207,12 @@ function buildSessionCards(
       };
     })
     .sort((a, b) => (b.totalChaos ?? 0) - (a.totalChaos ?? 0) || b.count - a.count || a.name.localeCompare(b.name));
+}
+
+function buildIgnoredCardKeys(cardNames: string[] | undefined): Set<string> {
+  return new Set((cardNames ?? []).map((name) => normalizeCardKey(name)).filter(Boolean));
+}
+
+function sumNullableValues(a: number | null | undefined, b: number | null | undefined): number | null {
+  return (a !== null && a !== undefined) || (b !== null && b !== undefined) ? (a ?? 0) + (b ?? 0) : null;
 }

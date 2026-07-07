@@ -8,6 +8,7 @@ import {
   normalizePriceSource,
   normalizePriceSourceMode
 } from "../../shared/priceSources.js";
+import { normalizeCardKey } from "../../shared/pricing.js";
 import { DEFAULT_PROFIT_FILTERS, normalizeProfitFilters } from "../../shared/profitFilters.js";
 import type { Settings } from "../../shared/types.js";
 
@@ -23,7 +24,9 @@ export function defaultSettings(): Settings {
     priceSourceMode: DEFAULT_PRICE_SOURCE_MODE,
     priceSourcePriority: DEFAULT_PRICE_SOURCE_PRIORITY,
     profitFilters: DEFAULT_PROFIT_FILTERS,
-    sessionLeagueOverrides: {}
+    ignoredCardNames: [],
+    sessionLeagueOverrides: {},
+    sessionDeckPriceOverrides: {}
   };
 }
 
@@ -43,7 +46,9 @@ export async function loadSettings(userDataPath: string): Promise<Settings> {
       priceSourceMode: normalizePriceSourceMode(saved.priceSourceMode),
       priceSourcePriority: normalizePriceSource(saved.priceSourcePriority),
       profitFilters: normalizeProfitFilters(saved.profitFilters),
-      sessionLeagueOverrides: normalizeSessionLeagueOverrides(saved.sessionLeagueOverrides)
+      ignoredCardNames: normalizeIgnoredCardNames(saved.ignoredCardNames),
+      sessionLeagueOverrides: normalizeSessionLeagueOverrides(saved.sessionLeagueOverrides),
+      sessionDeckPriceOverrides: normalizeSessionDeckPriceOverrides(saved.sessionDeckPriceOverrides)
     };
   } catch {
     return defaultSettings();
@@ -76,4 +81,24 @@ function normalizeSessionLeagueOverrides(value: unknown): Record<string, string>
   return Object.fromEntries(
     Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string" && isKnownLeagueId(entry[1]))
   );
+}
+
+function normalizeSessionDeckPriceOverrides(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= 0
+    )
+  );
+}
+
+function normalizeIgnoredCardNames(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(value.filter((entry): entry is string => typeof entry === "string").map(normalizeCardKey).filter(Boolean))].sort();
 }

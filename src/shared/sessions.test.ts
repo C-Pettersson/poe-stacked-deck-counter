@@ -102,6 +102,27 @@ describe("buildSessions", () => {
     expect(sessions[0].profitChaos).toBe(17);
   });
 
+  it("uses a session deck price override before fixed or market prices", () => {
+    const sessionId = "session-2025-11-01T12-07-45Z-1";
+    const sessions = buildSessions(
+      [makeDraw("2025-11-01T12:07:45Z", "The Lover"), makeDraw("2025-11-01T12:07:46Z", "The Lover")],
+      {
+        mirage: makeSnapshot("mirage", "Mirage", 10, 2)
+      },
+      {},
+      {
+        fixedStackedDeckPriceChaos: 1.5,
+        pricingLeagueId: "mirage",
+        sessionDeckPriceOverrides: {
+          [sessionId]: 3
+        }
+      }
+    );
+
+    expect(sessions[0].stackedDeckCostChaos).toBe(6);
+    expect(sessions[0].profitChaos).toBe(14);
+  });
+
   it("allows a fixed zero stacked deck price", () => {
     const sessions = buildSessions(
       [makeDraw("2025-11-01T12:07:45Z", "The Lover")],
@@ -117,6 +138,31 @@ describe("buildSessions", () => {
 
     expect(sessions[0].stackedDeckCostChaos).toBe(0);
     expect(sessions[0].profitChaos).toBe(10);
+  });
+
+  it("excludes manually ignored cards from value and profit while preserving raw prices", () => {
+    const sessions = buildSessions(
+      [makeDraw("2025-11-01T12:07:45Z", "The Lover"), makeDraw("2025-11-01T12:07:46Z", "The Lover")],
+      {
+        mirage: makeSnapshot("mirage", "Mirage", 10, 2)
+      },
+      {},
+      {
+        pricingLeagueId: "mirage",
+        ignoredCardNames: ["The Lover"]
+      }
+    );
+
+    expect(sessions[0].cards[0]).toMatchObject({
+      priceChaos: 10,
+      totalChaos: 20,
+      includedValueChaos: 0,
+      exclusionReason: "manual-ignore",
+      isValueIgnored: true
+    });
+    expect(sessions[0].totalValueChaos).toBe(0);
+    expect(sessions[0].stackedDeckCostChaos).toBe(4);
+    expect(sessions[0].profitChaos).toBe(-4);
   });
 
   it("excludes cards below the minimum card value from profit", () => {

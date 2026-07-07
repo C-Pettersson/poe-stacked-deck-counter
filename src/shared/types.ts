@@ -6,7 +6,7 @@ export type PriceConfidence = "high" | "low" | "unknown";
 export type PriceSource = "poe-watch" | "poe-ninja";
 export type PriceSourceMode = "hybrid" | PriceSource;
 export type ScanMode = "full" | "incremental" | "cached" | "restored";
-export type SessionCardExclusionReason = "card-value" | "stack-value" | "confidence";
+export type SessionCardExclusionReason = "card-value" | "stack-value" | "confidence" | "manual-ignore";
 
 export interface LeagueInfo {
   id: string;
@@ -72,6 +72,7 @@ export interface SessionCard {
   totalChaos: number | null;
   includedValueChaos?: number | null;
   exclusionReason?: SessionCardExclusionReason;
+  isValueIgnored?: boolean;
   hasPriceConfidence?: boolean;
   priceConfidence?: PriceConfidence;
   priceSource?: PriceSource;
@@ -153,7 +154,9 @@ export interface Settings {
   priceSourceMode: PriceSourceMode;
   priceSourcePriority: PriceSource;
   profitFilters: ProfitFilters;
+  ignoredCardNames: string[];
   sessionLeagueOverrides: Record<string, string>;
+  sessionDeckPriceOverrides: Record<string, number>;
 }
 
 export interface ProfitFilters {

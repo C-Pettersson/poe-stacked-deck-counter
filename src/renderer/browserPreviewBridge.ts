@@ -8,7 +8,7 @@ import {
   normalizePriceSource,
   normalizePriceSourceMode
 } from "../shared/priceSources.js";
-import { sourceUrlsFor } from "../shared/pricing.js";
+import { normalizeCardKey, sourceUrlsFor } from "../shared/pricing.js";
 import { DEFAULT_PROFIT_FILTERS, normalizeProfitFilters } from "../shared/profitFilters.js";
 import { buildSessions } from "../shared/sessions.js";
 import type {
@@ -32,7 +32,9 @@ const previewSettings: Settings = {
   priceSourceMode: DEFAULT_PRICE_SOURCE_MODE,
   priceSourcePriority: DEFAULT_PRICE_SOURCE_PRIORITY,
   profitFilters: DEFAULT_PROFIT_FILTERS,
-  sessionLeagueOverrides: {}
+  ignoredCardNames: [],
+  sessionLeagueOverrides: {},
+  sessionDeckPriceOverrides: {}
 };
 
 const previewAppInfo: AppInfo = {
@@ -260,7 +262,11 @@ function mergeSettings(serverSettings: Settings, savedSettings: Partial<Settings
     priceSourceMode: normalizePriceSourceMode(savedSettings.priceSourceMode ?? serverSettings.priceSourceMode),
     priceSourcePriority: normalizePriceSource(savedSettings.priceSourcePriority ?? serverSettings.priceSourcePriority),
     profitFilters: normalizeProfitFilters(savedSettings.profitFilters ?? serverSettings.profitFilters),
-    sessionLeagueOverrides: savedSettings.sessionLeagueOverrides ?? serverSettings.sessionLeagueOverrides
+    ignoredCardNames: normalizeIgnoredCardNames(savedSettings.ignoredCardNames ?? serverSettings.ignoredCardNames),
+    sessionLeagueOverrides: savedSettings.sessionLeagueOverrides ?? serverSettings.sessionLeagueOverrides,
+    sessionDeckPriceOverrides: normalizeSessionDeckPriceOverrides(
+      savedSettings.sessionDeckPriceOverrides ?? serverSettings.sessionDeckPriceOverrides
+    )
   };
 }
 
@@ -339,13 +345,35 @@ function createFallbackScanResult(filePath: string, currentSettings: Settings): 
     sessions: buildSessions(previewDraws, null, currentSettings.sessionLeagueOverrides, {
       fixedStackedDeckPriceChaos: currentSettings.fixedStackedDeckPriceChaos,
       pricingLeagueId: currentSettings.selectedLeagueId,
-      profitFilters: currentSettings.profitFilters
+      profitFilters: currentSettings.profitFilters,
+      ignoredCardNames: currentSettings.ignoredCardNames,
+      sessionDeckPriceOverrides: currentSettings.sessionDeckPriceOverrides
     })
   };
 }
 
 function normalizeOptionalChaosPrice(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function normalizeIgnoredCardNames(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(value.filter((entry): entry is string => typeof entry === "string").map(normalizeCardKey).filter(Boolean))].sort();
+}
+
+function normalizeSessionDeckPriceOverrides(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= 0
+    )
+  );
 }
 
 async function getPreviewJson<T>(path: string): Promise<T> {

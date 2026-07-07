@@ -45,13 +45,17 @@ export function App(): ReactElement {
           priceSnapshots={app.priceSnapshots}
           sessions={app.sessions}
           selectedSession={app.selectedSession}
+          sessionDeckPriceOverrides={app.settings.sessionDeckPriceOverrides}
           onSelect={app.selectSession}
           onLeagueChange={app.changeSessionLeague}
+          onSessionDeckPriceChange={(sessionId, deckPriceChaos) => void app.changeSessionDeckPrice(sessionId, deckPriceChaos)}
           onDiscord={(session) => void app.copyDiscord(session)}
           onReddit={(session) => void app.copyReddit(session)}
           onCopyPoeHow={(session) => void app.copyPoeHow(session)}
           onSavePoeHow={(session) => void app.savePoeHow(session)}
           onSaveCsv={(session) => void app.saveCsv(session)}
+          onOpenCardWiki={app.openCardWiki}
+          onToggleCardValue={(cardName) => void app.toggleIgnoredCardValue(cardName)}
         />
       ) : null}
 
@@ -64,6 +68,8 @@ export function App(): ReactElement {
           selectedSession={app.selectedSession}
           leagueFilterId={app.dataLeagueFilterId}
           onLeagueFilterChange={app.changeDataLeagueFilter}
+          onOpenCardWiki={app.openCardWiki}
+          onToggleCardValue={(cardName) => void app.toggleIgnoredCardValue(cardName)}
         />
       ) : null}
 

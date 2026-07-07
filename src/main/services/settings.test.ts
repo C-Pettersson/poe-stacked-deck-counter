@@ -19,6 +19,14 @@ describe("settings", () => {
     expect(defaultSettings().fixedStackedDeckPriceChaos).toBeNull();
   });
 
+  it("defaults ignored card names to empty", () => {
+    expect(defaultSettings().ignoredCardNames).toEqual([]);
+  });
+
+  it("defaults session deck price overrides to empty", () => {
+    expect(defaultSettings().sessionDeckPriceOverrides).toEqual({});
+  });
+
   it("defaults to hybrid prices with poe.watch priority", () => {
     expect(defaultSettings()).toMatchObject({
       priceSourceMode: "hybrid",
@@ -50,6 +58,20 @@ describe("settings", () => {
     expect(loadedSettings.fixedStackedDeckPriceChaos).toBe(1.7);
   });
 
+  it("round-trips session deck price overrides through persisted settings", async () => {
+    const userDataPath = await createTempDir();
+    const savedSettings = await saveSettings(userDataPath, {
+      ...defaultSettings(),
+      sessionDeckPriceOverrides: {
+        "session-1": 1.7
+      }
+    });
+    const loadedSettings = await loadSettings(userDataPath);
+
+    expect(savedSettings.sessionDeckPriceOverrides).toEqual({ "session-1": 1.7 });
+    expect(loadedSettings.sessionDeckPriceOverrides).toEqual({ "session-1": 1.7 });
+  });
+
   it("round-trips price source settings", async () => {
     const userDataPath = await createTempDir();
     const savedSettings = await saveSettings(userDataPath, {
@@ -69,6 +91,18 @@ describe("settings", () => {
     expect(loadedSettings.profitFilters.confidenceFilter).toBe("low-only");
   });
 
+  it("round-trips ignored card names through persisted settings", async () => {
+    const userDataPath = await createTempDir();
+    const savedSettings = await saveSettings(userDataPath, {
+      ...defaultSettings(),
+      ignoredCardNames: ["the watcher"]
+    });
+    const loadedSettings = await loadSettings(userDataPath);
+
+    expect(savedSettings.ignoredCardNames).toEqual(["the watcher"]);
+    expect(loadedSettings.ignoredCardNames).toEqual(["the watcher"]);
+  });
+
   it("normalizes unknown saved league ids", async () => {
     const userDataPath = await createTempDir();
     await writeFile(
@@ -79,6 +113,12 @@ describe("settings", () => {
         sessionLeagueOverrides: {
           "session-valid": "keepers",
           "session-invalid": "missing-league"
+        },
+        sessionDeckPriceOverrides: {
+          "session-free": 0,
+          "session-valid": 1.5,
+          "session-invalid-negative": -1,
+          "session-invalid-text": "1.2"
         }
       })}\n`,
       "utf8"
@@ -89,6 +129,10 @@ describe("settings", () => {
     expect(loadedSettings.selectedLeagueId).not.toBe("missing-league");
     expect(loadedSettings.sessionLeagueOverrides).toEqual({
       "session-valid": "keepers"
+    });
+    expect(loadedSettings.sessionDeckPriceOverrides).toEqual({
+      "session-free": 0,
+      "session-valid": 1.5
     });
   });
 
@@ -114,6 +158,22 @@ describe("settings", () => {
     expect(loadedSettings.priceSourceMode).toBe("hybrid");
     expect(loadedSettings.priceSourcePriority).toBe("poe-watch");
     expect(loadedSettings.profitFilters.confidenceFilter).toBe("high-only");
+  });
+
+  it("normalizes ignored card names", async () => {
+    const userDataPath = await createTempDir();
+    await writeFile(
+      path.join(userDataPath, "settings.json"),
+      `${JSON.stringify({
+        ...defaultSettings(),
+        ignoredCardNames: ["The Watcher", " the   watcher ", "The Doctor", 42, ""]
+      })}\n`,
+      "utf8"
+    );
+
+    const loadedSettings = await loadSettings(userDataPath);
+
+    expect(loadedSettings.ignoredCardNames).toEqual(["the doctor", "the watcher"]);
   });
 });
 

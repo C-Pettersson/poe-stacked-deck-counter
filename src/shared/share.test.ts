@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPoeHowDraft } from "./share.js";
+import { createDiscordShare, createPoeHowDraft, createRedditShare } from "./share.js";
 import type { DeckSession } from "./types.js";
 
 describe("createPoeHowDraft", () => {
@@ -14,6 +14,24 @@ describe("createPoeHowDraft", () => {
       amount: 2
     });
     expect(draft.metadata.rewardCount).toBe(1);
+  });
+});
+
+describe("sharing ignored cards", () => {
+  it("uses raw card totals for Discord value and profit", () => {
+    const share = createDiscordShare(makeIgnoredSession());
+
+    expect(share.text).toContain("Value: **2.00c**");
+    expect(share.text).toContain("Profit: **+1.00c**");
+    expect(share.text).toContain("- 2x The Lover (2.00c)");
+  });
+
+  it("uses raw card totals for Reddit value and profit", () => {
+    const share = createRedditShare(makeIgnoredSession());
+
+    expect(share.text).toContain("Total value: 2.00c");
+    expect(share.text).toContain("Profit: +1.00c");
+    expect(share.text).toContain("| The Lover | 2 | 1.00c | 2.00c |");
   });
 });
 
@@ -43,5 +61,25 @@ function makeSession(): DeckSession {
     profitChaos: 1,
     pricedCards: 1,
     missingPrices: 0
+  };
+}
+
+function makeIgnoredSession(): DeckSession {
+  return {
+    ...makeSession(),
+    cards: [
+      {
+        name: "The Lover",
+        count: 2,
+        priceChaos: 1,
+        totalChaos: 2,
+        includedValueChaos: 0,
+        exclusionReason: "manual-ignore",
+        isValueIgnored: true,
+        detailsId: "the-lover"
+      }
+    ],
+    totalValueChaos: 0,
+    profitChaos: -1
   };
 }

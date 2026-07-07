@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ChevronsUpDown, Database } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, Database, ExternalLink, Eye, EyeOff } from "lucide-react";
 import { useMemo, useState, type ReactElement } from "react";
 import { formatDropRate, formatPercent } from "../../shared/format.js";
 import { CHALLENGE_LEAGUES } from "../../shared/leagues.js";
@@ -15,6 +15,7 @@ import {
   type DataLeagueFilterId
 } from "../app/dataLeagueFilter.js";
 import { getSessionsCurrencySnapshot } from "../app/sessionSummary.js";
+import { filterCardsByIgnoredVisibility, filterCardsBySearch } from "../cardFilter.js";
 import {
   DEFAULT_DATA_SORT,
   getNextDataSort,
@@ -39,7 +40,9 @@ export function DataTab({
   sessions,
   selectedSession,
   leagueFilterId,
-  onLeagueFilterChange
+  onLeagueFilterChange,
+  onOpenCardWiki,
+  onToggleCardValue
 }: {
   currencyMode: Settings["currencyMode"];
   fallbackCurrencySnapshot?: PriceSnapshot;
@@ -48,8 +51,12 @@ export function DataTab({
   selectedSession: DeckSession | null;
   leagueFilterId: DataLeagueFilterId;
   onLeagueFilterChange: (filterId: DataLeagueFilterId) => void;
+  onOpenCardWiki: (cardName: string) => void;
+  onToggleCardValue: (cardName: string) => void;
 }): ReactElement {
   const [dataSort, setDataSort] = useState<DataSortState>(DEFAULT_DATA_SORT);
+  const [cardSearch, setCardSearch] = useState("");
+  const [showIgnored, setShowIgnored] = useState(false);
   const effectiveFilterId =
     leagueFilterId === SELECTED_SESSION_FILTER_ID && !selectedSession ? ALL_LEAGUES_FILTER_ID : leagueFilterId;
   const leagueCounts = useMemo(() => countSessionsByLeague(sessions), [sessions]);
@@ -65,10 +72,21 @@ export function DataTab({
     () => getSessionsCurrencySnapshot(visibleSessions, priceSnapshots, fallbackCurrencySnapshot),
     [fallbackCurrencySnapshot, priceSnapshots, visibleSessions]
   );
-  const cards = useMemo(
+  const sortedCards = useMemo(
     () => sortDataCards(rollupCards(visibleSessions), totalCards, dataSort),
     [dataSort, totalCards, visibleSessions]
   );
+  const visibleCards = useMemo(
+    () => filterCardsByIgnoredVisibility(sortedCards, showIgnored),
+    [showIgnored, sortedCards]
+  );
+  const cards = useMemo(() => filterCardsBySearch(visibleCards, cardSearch), [cardSearch, visibleCards]);
+  const emptyMessage =
+    sortedCards.length === 0
+      ? "No cards match this filter"
+      : visibleCards.length === 0 && !showIgnored
+        ? "Only ignored cards are hidden"
+        : "No cards match this search";
 
   return (
     <section className="data-panel">
@@ -76,10 +94,30 @@ export function DataTab({
         <div>
           <h2>{getDataFilterTitle(effectiveFilterId)}</h2>
           <p>
-            {visibleSessions.length.toLocaleString()} of {sessions.length.toLocaleString()} sessions loaded
+            {visibleSessions.length.toLocaleString()} of {sessions.length.toLocaleString()} sessions loaded,{" "}
+            {cards.length.toLocaleString()} of {sortedCards.length.toLocaleString()} cards shown
           </p>
         </div>
         <div className="data-actions">
+          <label className="field-shell card-search-field">
+            <span>Card search</span>
+            <input
+              aria-label="Search data cards"
+              placeholder="Search cards"
+              type="search"
+              value={cardSearch}
+              onChange={(event) => setCardSearch(event.target.value)}
+            />
+          </label>
+          <label className="field-shell checkbox-shell compact-checkbox">
+            <span>Show ignored</span>
+            <input
+              aria-label="Show ignored data cards"
+              type="checkbox"
+              checked={showIgnored}
+              onChange={(event) => setShowIgnored(event.target.checked)}
+            />
+          </label>
           <label className="select-shell compact">
             <span>League filter</span>
             <select
@@ -108,6 +146,9 @@ export function DataTab({
         <table>
           <thead>
             <tr>
+              <th className="actions-column" scope="col">
+                Actions
+              </th>
               {DATA_TABLE_COLUMNS.map((column) => (
                 <DataSortHeader
                   key={column.key}
@@ -121,24 +162,55 @@ export function DataTab({
           </thead>
           <tbody>
             {cards.length > 0 ? (
-              cards.map((card) => (
-                <tr key={card.name}>
-                  <td>{card.name}</td>
-                  <td>{card.count.toLocaleString()}</td>
-                  <td>{formatDropRate(card.count, totalCards)}</td>
-                  <td>
-                    <CurrencyAmount mode={currencyMode} snapshot={currencySnapshot} valueChaos={card.priceChaos} />
-                  </td>
-                  <td>
-                    <CurrencyAmount mode={currencyMode} snapshot={currencySnapshot} valueChaos={card.totalChaos} />
-                  </td>
-                  <td>{formatPercent(card.change7d)}</td>
-                </tr>
-              ))
+              cards.map((card) => {
+                const IgnoreIcon = card.isValueIgnored ? Eye : EyeOff;
+
+                return (
+                  <tr key={card.name}>
+                    <td className="actions-cell">
+                      <button
+                        aria-label={`Open ${card.name} on PoE Wiki`}
+                        className="card-icon-button"
+                        title={`Open ${card.name} on PoE Wiki`}
+                        type="button"
+                        onClick={() => onOpenCardWiki(card.name)}
+                      >
+                        <ExternalLink size={14} />
+                      </button>
+                      <button
+                        aria-label={card.isValueIgnored ? `Count ${card.name} value` : `Ignore ${card.name} value`}
+                        className={card.isValueIgnored ? "card-icon-button active" : "card-icon-button"}
+                        title={card.isValueIgnored ? `Count ${card.name} value` : `Ignore ${card.name} value`}
+                        type="button"
+                        onClick={() => onToggleCardValue(card.name)}
+                      >
+                        <IgnoreIcon size={14} />
+                      </button>
+                    </td>
+                    <td>
+                      <div className="data-card-cell">
+                        <div className="data-card-name-row">
+                          <span>{card.name}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>{card.count.toLocaleString()}</td>
+                    <td>{formatDropRate(card.count, totalCards)}</td>
+                    <td>
+                      <CurrencyAmount mode={currencyMode} snapshot={currencySnapshot} valueChaos={card.priceChaos} />
+                    </td>
+                    <td>
+                      <CurrencyAmount mode={currencyMode} snapshot={currencySnapshot} valueChaos={card.totalChaos} />
+                      {card.isValueIgnored ? <span className="value-filter-note">ignored by player</span> : null}
+                    </td>
+                    <td>{formatPercent(card.change7d)}</td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
-                <td className="table-empty" colSpan={6}>
-                  No cards match this filter
+                <td className="table-empty" colSpan={7}>
+                  {emptyMessage}
                 </td>
               </tr>
             )}

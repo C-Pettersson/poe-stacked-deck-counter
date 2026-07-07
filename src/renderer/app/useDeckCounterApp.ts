@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getCardWikiUrl } from "../../shared/cardMetadata.js";
 import { formatDateTime } from "../../shared/format.js";
+import { normalizeCardKey } from "../../shared/pricing.js";
 import { buildSessions, updateSessionLeagueOverrides } from "../../shared/sessions.js";
 import {
   createCsv,
@@ -127,8 +129,10 @@ export function useDeckCounterApp() {
   }, [
     settings?.autoScanEnabled,
     settings?.fixedStackedDeckPriceChaos,
+    settings?.ignoredCardNames,
     settings?.logPath,
     settings?.profitFilters,
+    settings?.sessionDeckPriceOverrides,
     settings?.sessionLeagueOverrides
   ]);
 
@@ -137,14 +141,18 @@ export function useDeckCounterApp() {
       buildSessions(scanResult?.draws ?? [], priceSnapshots, settings?.sessionLeagueOverrides ?? {}, {
         fixedStackedDeckPriceChaos: settings?.fixedStackedDeckPriceChaos,
         pricingLeagueId: settings?.selectedLeagueId,
-        profitFilters: settings?.profitFilters
+        profitFilters: settings?.profitFilters,
+        ignoredCardNames: settings?.ignoredCardNames,
+        sessionDeckPriceOverrides: settings?.sessionDeckPriceOverrides
       }).sort((a, b) => Date.parse(b.startAt) - Date.parse(a.startAt)),
     [
       priceSnapshots,
       scanResult?.draws,
       settings?.fixedStackedDeckPriceChaos,
+      settings?.ignoredCardNames,
       settings?.profitFilters,
       settings?.selectedLeagueId,
+      settings?.sessionDeckPriceOverrides,
       settings?.sessionLeagueOverrides
     ]
   );
@@ -327,6 +335,25 @@ export function useDeckCounterApp() {
     await updateSettings({ ...settings, fixedStackedDeckPriceChaos });
   }
 
+  async function changeSessionDeckPrice(sessionId: string, deckPriceChaos: number | null): Promise<void> {
+    if (!settings) {
+      return;
+    }
+
+    const sessionDeckPriceOverrides = { ...settings.sessionDeckPriceOverrides };
+
+    if (deckPriceChaos === null || !Number.isFinite(deckPriceChaos) || deckPriceChaos < 0) {
+      delete sessionDeckPriceOverrides[sessionId];
+    } else {
+      sessionDeckPriceOverrides[sessionId] = deckPriceChaos;
+    }
+
+    await updateSettings({
+      ...settings,
+      sessionDeckPriceOverrides
+    });
+  }
+
   async function changeSessionLeague(sessionId: string, leagueId: string): Promise<void> {
     if (!settings) {
       return;
@@ -348,6 +375,26 @@ export function useDeckCounterApp() {
     };
     setSelectedSessionId(sessionId);
     await updateSettings(nextSettings);
+  }
+
+  async function toggleIgnoredCardValue(cardName: string): Promise<void> {
+    if (!settings) {
+      return;
+    }
+
+    const cardKey = normalizeCardKey(cardName);
+    const ignoredCardNames = new Set(settings.ignoredCardNames);
+
+    if (ignoredCardNames.has(cardKey)) {
+      ignoredCardNames.delete(cardKey);
+    } else {
+      ignoredCardNames.add(cardKey);
+    }
+
+    await updateSettings({
+      ...settings,
+      ignoredCardNames: [...ignoredCardNames].sort()
+    });
   }
 
   function refreshSelectedPrices(): void {
@@ -423,6 +470,10 @@ export function useDeckCounterApp() {
     void window.poeDeck.openExternal(url);
   }
 
+  function openCardWiki(cardName: string): void {
+    openExternal(getCardWikiUrl(cardName));
+  }
+
   return {
     activeTab,
     appInfo,
@@ -436,6 +487,7 @@ export function useDeckCounterApp() {
     changePriceSourceMode,
     changePriceSourcePriority,
     changeProfitFilters,
+    changeSessionDeckPrice,
     changeSessionLeague,
     checkForAppUpdate,
     chooseLogFile,
@@ -449,6 +501,7 @@ export function useDeckCounterApp() {
     isScanning,
     notice,
     openExternal,
+    openCardWiki,
     priceSnapshots,
     priceStatus,
     refreshSelectedPrices,
@@ -462,7 +515,8 @@ export function useDeckCounterApp() {
     sessions,
     setActiveTab,
     settings,
-    summary
+    summary,
+    toggleIgnoredCardValue
   };
 }
 

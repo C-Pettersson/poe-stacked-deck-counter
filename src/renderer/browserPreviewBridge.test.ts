@@ -12,7 +12,9 @@ const settings: Settings = {
   priceSourceMode: "hybrid",
   priceSourcePriority: "poe-watch",
   profitFilters: DEFAULT_PROFIT_FILTERS,
-  sessionLeagueOverrides: {}
+  ignoredCardNames: [],
+  sessionLeagueOverrides: {},
+  sessionDeckPriceOverrides: {}
 };
 
 const apiScanResult: ScanResult = {

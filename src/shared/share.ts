@@ -4,10 +4,11 @@ import type { DeckSession, SessionCard, SharePayload } from "./types.js";
 
 export function createDiscordShare(session: DeckSession): SharePayload {
   const topCards = session.cards.slice(0, 8).map(formatShareCard).join("\n");
+  const totalValueChaos = getRawTotalValueChaos(session);
   const text = [
     `**${session.totalCards} Stacked Decks - ${session.leagueName}**`,
     formatDateRange(session.startAt, session.endAt),
-    `Value: **${formatChaos(session.totalValueChaos)}** | Cost: **${formatChaos(session.stackedDeckCostChaos)}** | Profit: **${formatSignedChaos(session.profitChaos)}**`,
+    `Value: **${formatChaos(totalValueChaos)}** | Cost: **${formatChaos(session.stackedDeckCostChaos)}** | Profit: **${formatSignedChaos(totalValueChaos - session.stackedDeckCostChaos)}**`,
     "",
     topCards
   ]
@@ -18,6 +19,7 @@ export function createDiscordShare(session: DeckSession): SharePayload {
 }
 
 export function createRedditShare(session: DeckSession): SharePayload {
+  const totalValueChaos = getRawTotalValueChaos(session);
   const rows = session.cards
     .slice()
     .sort((a, b) => b.count - a.count || (b.totalChaos ?? 0) - (a.totalChaos ?? 0))
@@ -29,9 +31,9 @@ export function createRedditShare(session: DeckSession): SharePayload {
     "",
     `Session: ${formatDateRange(session.startAt, session.endAt)}`,
     "",
-    `Total value: ${formatChaos(session.totalValueChaos)}`,
+    `Total value: ${formatChaos(totalValueChaos)}`,
     `Deck cost: ${formatChaos(session.stackedDeckCostChaos)}`,
-    `Profit: ${formatSignedChaos(session.profitChaos)}`,
+    `Profit: ${formatSignedChaos(totalValueChaos - session.stackedDeckCostChaos)}`,
     "",
     "| Card | Count | Price | Total |",
     "|---|---:|---:|---:|",
@@ -103,6 +105,10 @@ export function stringifyDraft(draft: unknown): string {
 
 function formatShareCard(card: SessionCard): string {
   return `- ${card.count}x ${card.name} (${formatChaos(card.totalChaos)})`;
+}
+
+function getRawTotalValueChaos(session: DeckSession): number {
+  return session.cards.reduce((total, card) => total + (card.totalChaos ?? 0), 0);
 }
 
 function escapePipes(value: string): string {

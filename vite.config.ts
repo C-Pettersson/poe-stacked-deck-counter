@@ -126,7 +126,9 @@ function createPreviewScanResult(filePath: string, result: ClientLogScan, settin
     sessions: buildSessions(result.draws, null, settings.sessionLeagueOverrides, {
       fixedStackedDeckPriceChaos: settings.fixedStackedDeckPriceChaos,
       pricingLeagueId: settings.selectedLeagueId,
-      profitFilters: settings.profitFilters
+      profitFilters: settings.profitFilters,
+      ignoredCardNames: settings.ignoredCardNames,
+      sessionDeckPriceOverrides: settings.sessionDeckPriceOverrides
     })
   };
 }
