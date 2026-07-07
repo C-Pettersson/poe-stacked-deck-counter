@@ -14,7 +14,7 @@ export class PriceCache {
   async getPrices(league: LeagueInfo, forceRefresh = false): Promise<PriceSnapshot> {
     const cached = await this.readSnapshot(league.id);
 
-    if (cached && !forceRefresh && isSnapshotFresh(cached)) {
+    if (cached && !forceRefresh && isSnapshotFresh(cached) && usesCurrentPriceSources(cached, league)) {
       return { ...cached, fromCache: true };
     }
 
@@ -52,6 +52,13 @@ export class PriceCache {
   private snapshotPath(leagueId: string): string {
     return path.join(this.cacheDir, `${leagueId}.json`);
   }
+}
+
+function usesCurrentPriceSources(snapshot: PriceSnapshot, league: LeagueInfo): boolean {
+  return (
+    snapshot.sourceUrls?.cards === cardPricesUrl(league.poeNinjaName) &&
+    snapshot.sourceUrls?.stackedDeck === stackedDeckUrl(league.poeNinjaName)
+  );
 }
 
 async function getJson(url: string): Promise<unknown> {
