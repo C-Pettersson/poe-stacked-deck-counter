@@ -1,156 +1,221 @@
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
-import { spawn } from "node:child_process";
-import readline from "node:readline";
 import { parseCardNameFromLine, parseTimestampFromLogLine, CARD_DRAW_MARKER } from "../../shared/clientLog.js";
-import type { ClientLogDraw, ScanProgress } from "../../shared/types.js";
+import type { ClientLogDraw, ScanMode, ScanProgress } from "../../shared/types.js";
+import type { CachedPendingDraw, LogScanSnapshot } from "./logScanCache.js";
+import { LogScanCache } from "./logScanCache.js";
 
-interface PendingDraw {
-  timestamp: string;
-  lineNumber: number;
+interface ScanClientLogOptions {
+  cache?: LogScanCache;
+  onProgress?: (progress: ScanProgress) => void;
 }
 
-export async function scanClientLog(
-  filePath: string,
-  onProgress?: (progress: ScanProgress) => void
-): Promise<{ fileSize: number; draws: ClientLogDraw[] }> {
-  try {
-    return await scanClientLogWithRipgrep(filePath, onProgress);
-  } catch {
-    return scanClientLogStream(filePath, onProgress);
-  }
+export interface ClientLogScan {
+  fileSize: number;
+  linesRead: number;
+  scannedAt: string;
+  scanMode: ScanMode;
+  bytesScanned: number;
+  cachedBytes: number;
+  draws: ClientLogDraw[];
+  pendingDraw: CachedPendingDraw | null;
 }
 
-async function scanClientLogWithRipgrep(
-  filePath: string,
-  onProgress?: (progress: ScanProgress) => void
-): Promise<{ fileSize: number; draws: ClientLogDraw[] }> {
+interface ScanStreamOptions {
+  fileSize: number;
+  startByte: number;
+  initialLinesRead: number;
+  initialDraws: ClientLogDraw[];
+  initialPendingDraw: CachedPendingDraw | null;
+  scanMode: Extract<ScanMode, "full" | "incremental">;
+  onProgress?: (progress: ScanProgress) => void;
+}
+
+const READ_STREAM_HIGH_WATER_MARK = 1024 * 1024;
+const PROGRESS_INTERVAL_MS = 250;
+
+export async function scanClientLog(filePath: string, options: ScanClientLogOptions = {}): Promise<ClientLogScan> {
+  const cache = options.cache;
   const fileStats = await stat(filePath);
-  const output = await runRipgrep([
-    "--line-number",
-    "--no-heading",
-    "--after-context",
-    "1",
-    "--fixed-strings",
-    CARD_DRAW_MARKER,
-    filePath
-  ]);
-  const draws = parseRipgrepOutput(output);
+  const cached = cache ? await cache.read(filePath) : null;
+  const cachedIsUsable = cached && cache ? await canResumeFromCache(filePath, fileStats.size, cached, cache) : false;
 
-  onProgress?.({
-    bytesRead: fileStats.size,
-    totalBytes: fileStats.size,
-    linesRead: draws.at(-1)?.lineNumber ?? 0,
-    drawsFound: draws.length
-  });
-
-  return { fileSize: fileStats.size, draws };
-}
-
-function runRipgrep(args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const child = spawn("rg", args, { windowsHide: true });
-    const stdout: Buffer[] = [];
-    const stderr: Buffer[] = [];
-
-    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
-    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
-    child.on("error", reject);
-    child.on("close", (code) => {
-      if (code === 0 || code === 1) {
-        resolve(Buffer.concat(stdout).toString("utf8"));
-        return;
-      }
-
-      reject(new Error(Buffer.concat(stderr).toString("utf8") || `rg exited with code ${code}`));
+  if (cached && cachedIsUsable && cached.fileSize === fileStats.size) {
+    const result = createCachedScan(cached);
+    options.onProgress?.({
+      bytesRead: result.fileSize,
+      totalBytes: result.fileSize,
+      linesRead: result.linesRead,
+      drawsFound: result.draws.length,
+      cachedBytes: result.cachedBytes,
+      scanMode: result.scanMode
     });
-  });
-}
-
-function parseRipgrepOutput(output: string): ClientLogDraw[] {
-  const draws: ClientLogDraw[] = [];
-  let pending: PendingDraw | null = null;
-
-  for (const rawLine of output.split(/\r?\n/)) {
-    if (!rawLine) {
-      continue;
-    }
-
-    const match = rawLine.match(/^(\d+)([:-])(.*)$/);
-    if (!match) {
-      continue;
-    }
-
-    const lineNumber = Number(match[1]);
-    const separator = match[2];
-    const line = match[3];
-    const timestamp = parseTimestampFromLogLine(line);
-    const cardName = parseCardNameFromLine(line);
-    const hasMarker = line.includes(CARD_DRAW_MARKER);
-
-    if (separator === ":" && hasMarker && timestamp && cardName) {
-      draws.push(createDraw(lineNumber, timestamp, cardName));
-      pending = null;
-    } else if (separator === ":" && hasMarker && timestamp) {
-      pending = { timestamp, lineNumber };
-    } else if (separator === "-" && pending && cardName) {
-      draws.push(createDraw(pending.lineNumber, pending.timestamp, cardName));
-      pending = null;
-    } else if (separator === ":" && timestamp) {
-      pending = null;
-    }
+    return result;
   }
 
-  return draws;
+  const shouldIncrement = cached && cachedIsUsable && cached.fileSize < fileStats.size;
+  const streamResult = await scanClientLogStream(filePath, {
+    fileSize: fileStats.size,
+    startByte: shouldIncrement ? cached.fileSize : 0,
+    initialLinesRead: shouldIncrement ? cached.linesRead : 0,
+    initialDraws: shouldIncrement ? cached.draws : [],
+    initialPendingDraw: shouldIncrement ? cached.pendingDraw : null,
+    scanMode: shouldIncrement ? "incremental" : "full",
+    onProgress: options.onProgress
+  });
+
+  if (cache) {
+    await cache.write({
+      filePath,
+      fileSize: streamResult.fileSize,
+      linesRead: streamResult.linesRead,
+      scannedAt: streamResult.scannedAt,
+      draws: streamResult.draws,
+      pendingDraw: streamResult.pendingDraw
+    });
+  }
+
+  return streamResult;
 }
 
-async function scanClientLogStream(
-  filePath: string,
-  onProgress?: (progress: ScanProgress) => void
-): Promise<{ fileSize: number; draws: ClientLogDraw[] }> {
-  const fileStats = await stat(filePath);
-  const draws: ClientLogDraw[] = [];
-  const input = createReadStream(filePath, { encoding: "utf8", highWaterMark: 1024 * 1024 });
-  const reader = readline.createInterface({ input, crlfDelay: Infinity });
+export async function loadCachedClientLog(filePath: string, cache: LogScanCache): Promise<ClientLogScan | null> {
+  const cached = await cache.read(filePath);
+  return cached ? createCachedScan(cached, "restored") : null;
+}
 
-  let bytesRead = 0;
-  let linesRead = 0;
-  let pending: PendingDraw | null = null;
+async function canResumeFromCache(
+  filePath: string,
+  currentFileSize: number,
+  cached: LogScanSnapshot,
+  cache: LogScanCache
+): Promise<boolean> {
+  if (cached.fileSize > currentFileSize) {
+    return false;
+  }
+
+  return cache.matchesAnchor(filePath, cached);
+}
+
+function createCachedScan(cached: LogScanSnapshot, scanMode: Extract<ScanMode, "cached" | "restored"> = "cached"): ClientLogScan {
+  return {
+    fileSize: cached.fileSize,
+    linesRead: cached.linesRead,
+    scannedAt: new Date().toISOString(),
+    scanMode,
+    bytesScanned: 0,
+    cachedBytes: cached.fileSize,
+    draws: cached.draws,
+    pendingDraw: cached.pendingDraw
+  };
+}
+
+async function scanClientLogStream(filePath: string, options: ScanStreamOptions): Promise<ClientLogScan> {
+  const draws = [...options.initialDraws];
+  const input = createReadStream(filePath, {
+    highWaterMark: READ_STREAM_HIGH_WATER_MARK,
+    start: options.startByte
+  });
+
+  let bytesReadFromStream = 0;
+  let linesRead = options.initialLinesRead;
+  let pendingDraw = options.initialPendingDraw;
+  let pendingBuffer = Buffer.alloc(0);
   let lastProgressAt = 0;
 
-  input.on("data", (chunk) => {
-    bytesRead += Buffer.byteLength(chunk, "utf8");
-  });
+  for await (const chunk of input) {
+    const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    bytesReadFromStream += bufferChunk.length;
 
-  for await (const line of reader) {
-    linesRead += 1;
+    const buffer = pendingBuffer.length > 0 ? Buffer.concat([pendingBuffer, bufferChunk]) : bufferChunk;
+    let lineStart = 0;
+    let newlineIndex = buffer.indexOf(10, lineStart);
 
-    const timestamp = parseTimestampFromLogLine(line);
-    const cardName = parseCardNameFromLine(line);
-    const hasMarker = line.includes(CARD_DRAW_MARKER);
-
-    if (hasMarker && timestamp && cardName) {
-      draws.push(createDraw(linesRead, timestamp, cardName));
-      pending = null;
-    } else if (hasMarker && timestamp) {
-      pending = { timestamp, lineNumber: linesRead };
-    } else if (pending && cardName) {
-      draws.push(createDraw(pending.lineNumber, pending.timestamp, cardName));
-      pending = null;
-    } else if (timestamp) {
-      pending = null;
+    while (newlineIndex !== -1) {
+      const lineBuffer = stripCarriageReturn(buffer.subarray(lineStart, newlineIndex));
+      const nextState = parseLogLine(lineBuffer.toString("utf8"), linesRead + 1, pendingDraw, draws);
+      linesRead = nextState.linesRead;
+      pendingDraw = nextState.pendingDraw;
+      lineStart = newlineIndex + 1;
+      newlineIndex = buffer.indexOf(10, lineStart);
     }
 
+    pendingBuffer = buffer.subarray(lineStart);
+
     const now = Date.now();
-    if (onProgress && now - lastProgressAt > 250) {
+    if (options.onProgress && now - lastProgressAt > PROGRESS_INTERVAL_MS) {
       lastProgressAt = now;
-      onProgress({ bytesRead, totalBytes: fileStats.size, linesRead, drawsFound: draws.length });
+      options.onProgress({
+        bytesRead: Math.min(options.fileSize, options.startByte + bytesReadFromStream),
+        totalBytes: options.fileSize,
+        linesRead,
+        drawsFound: draws.length,
+        cachedBytes: options.startByte,
+        scanMode: options.scanMode
+      });
     }
   }
 
-  onProgress?.({ bytesRead: fileStats.size, totalBytes: fileStats.size, linesRead, drawsFound: draws.length });
+  if (pendingBuffer.length > 0) {
+    const lineBuffer = stripCarriageReturn(pendingBuffer);
+    const nextState = parseLogLine(lineBuffer.toString("utf8"), linesRead + 1, pendingDraw, draws);
+    linesRead = nextState.linesRead;
+    pendingDraw = nextState.pendingDraw;
+  }
 
-  return { fileSize: fileStats.size, draws };
+  options.onProgress?.({
+    bytesRead: options.fileSize,
+    totalBytes: options.fileSize,
+    linesRead,
+    drawsFound: draws.length,
+    cachedBytes: options.startByte,
+    scanMode: options.scanMode
+  });
+
+  return {
+    fileSize: options.fileSize,
+    linesRead,
+    scannedAt: new Date().toISOString(),
+    scanMode: options.scanMode,
+    bytesScanned: options.fileSize - options.startByte,
+    cachedBytes: options.startByte,
+    draws,
+    pendingDraw
+  };
+}
+
+function parseLogLine(
+  line: string,
+  lineNumber: number,
+  pendingDraw: CachedPendingDraw | null,
+  draws: ClientLogDraw[]
+): { linesRead: number; pendingDraw: CachedPendingDraw | null } {
+  const timestamp = parseTimestampFromLogLine(line);
+  const cardName = parseCardNameFromLine(line);
+  const hasMarker = line.includes(CARD_DRAW_MARKER);
+
+  if (hasMarker && timestamp && cardName) {
+    draws.push(createDraw(lineNumber, timestamp, cardName));
+    return { linesRead: lineNumber, pendingDraw: null };
+  }
+
+  if (hasMarker && timestamp) {
+    return { linesRead: lineNumber, pendingDraw: { timestamp, lineNumber } };
+  }
+
+  if (pendingDraw && cardName) {
+    draws.push(createDraw(pendingDraw.lineNumber, pendingDraw.timestamp, cardName));
+    return { linesRead: lineNumber, pendingDraw: null };
+  }
+
+  if (timestamp) {
+    return { linesRead: lineNumber, pendingDraw: null };
+  }
+
+  return { linesRead: lineNumber, pendingDraw };
+}
+
+function stripCarriageReturn(buffer: Buffer): Buffer {
+  return buffer.length > 0 && buffer[buffer.length - 1] === 13 ? buffer.subarray(0, -1) : buffer;
 }
 
 function createDraw(lineNumber: number, timestamp: string, cardName: string): ClientLogDraw {

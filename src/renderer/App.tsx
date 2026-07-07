@@ -49,6 +49,7 @@ import {
   type DataSortKey,
   type DataSortState
 } from "./dataSort.js";
+import { resolveSelectedSession, resolveSelectedSessionId } from "./sessionSelection.js";
 
 const initialProgress: ScanProgress = {
   bytesRead: 0,
@@ -181,12 +182,13 @@ export function App(): ReactElement {
     [priceSnapshots, scanResult?.draws, settings?.profitFilters, settings?.selectedLeagueId, settings?.sessionLeagueOverrides]
   );
 
-  const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? sessions[0] ?? null;
+  const selectedSession = resolveSelectedSession(sessions, selectedSessionId);
   const summary = useMemo(() => summarizeSessions(sessions), [sessions]);
 
   useEffect(() => {
-    if (!selectedSessionId && sessions.length > 0) {
-      setSelectedSessionId(sessions[0].id);
+    const resolvedSessionId = resolveSelectedSessionId(sessions, selectedSessionId);
+    if (resolvedSessionId !== selectedSessionId) {
+      setSelectedSessionId(resolvedSessionId);
     }
   }, [selectedSessionId, sessions]);
 

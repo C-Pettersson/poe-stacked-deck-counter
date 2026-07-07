@@ -1,6 +1,7 @@
 export type AppTab = "sessions" | "data" | "settings";
 export type CurrencyDenomination = "chaos" | "divine";
 export type CurrencyMode = "auto" | "chaos";
+export type ScanMode = "full" | "incremental" | "cached" | "restored";
 export type SessionCardExclusionReason = "card-value" | "stack-value" | "confidence";
 
 export interface LeagueInfo {
@@ -25,12 +26,17 @@ export interface ScanProgress {
   totalBytes: number;
   linesRead: number;
   drawsFound: number;
+  cachedBytes?: number;
+  scanMode?: ScanMode;
 }
 
 export interface ScanResult {
   filePath: string;
   fileSize: number;
   scannedAt: string;
+  scanMode?: ScanMode;
+  bytesScanned?: number;
+  cachedBytes?: number;
   draws: ClientLogDraw[];
   sessions: DeckSession[];
 }
@@ -123,6 +129,7 @@ export interface Settings {
   logPath: string;
   selectedLeagueId: string;
   currencyMode: CurrencyMode;
+  autoScanEnabled: boolean;
   profitFilters: ProfitFilters;
   sessionLeagueOverrides: Record<string, string>;
 }

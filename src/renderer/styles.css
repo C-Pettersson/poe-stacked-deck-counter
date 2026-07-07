@@ -70,6 +70,13 @@ input[type="number"] {
   background: #151c21;
 }
 
+input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #21a584;
+}
+
 h1,
 h2,
 h3,
@@ -186,6 +193,15 @@ p {
   gap: 5px;
   color: #aebec6;
   font-size: 12px;
+}
+
+.checkbox-shell {
+  min-height: 40px;
+  max-width: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .select-shell.compact select {

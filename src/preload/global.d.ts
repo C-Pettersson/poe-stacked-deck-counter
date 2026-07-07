@@ -15,6 +15,9 @@ declare global {
       saveSettings: (settings: Settings) => Promise<Settings>;
       chooseLogFile: () => Promise<string | null>;
       scanLog: (filePath: string, settings: Settings) => Promise<ScanResult>;
+      loadCachedScan: (filePath: string, settings: Settings) => Promise<ScanResult | null>;
+      configureAutoScan: (filePath: string, settings: Settings) => Promise<boolean>;
+      stopAutoScan: () => Promise<boolean>;
       getPrices: (leagueId: string, forceRefresh?: boolean) => Promise<PriceSnapshot>;
       copyText: (text: string) => Promise<boolean>;
       saveTextFile: (defaultFileName: string, content: string) => Promise<string | null>;
@@ -23,6 +26,8 @@ declare global {
       checkForUpdate: () => Promise<AppUpdateInfo>;
       getLeagues: () => Promise<LeagueInfo[]>;
       onScanProgress: (listener: (progress: ScanProgress) => void) => () => void;
+      onAutoScanResult: (listener: (result: ScanResult) => void) => () => void;
+      onAutoScanError: (listener: (message: string) => void) => () => void;
     };
   }
 }

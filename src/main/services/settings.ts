@@ -12,6 +12,7 @@ export function defaultSettings(): Settings {
     logPath: DEFAULT_LOG_PATH,
     selectedLeagueId: getDefaultLeague().id,
     currencyMode: DEFAULT_CURRENCY_MODE,
+    autoScanEnabled: false,
     profitFilters: DEFAULT_PROFIT_FILTERS,
     sessionLeagueOverrides: {}
   };
@@ -27,6 +28,7 @@ export async function loadSettings(userDataPath: string): Promise<Settings> {
       ...defaultSettings(),
       ...saved,
       currencyMode: saved.currencyMode === "chaos" ? "chaos" : DEFAULT_CURRENCY_MODE,
+      autoScanEnabled: saved.autoScanEnabled === true,
       profitFilters: normalizeProfitFilters(saved.profitFilters),
       sessionLeagueOverrides: saved.sessionLeagueOverrides ?? {}
     };

@@ -6,7 +6,8 @@ import packageJson from "./package.json";
 import { CHALLENGE_LEAGUES, getLeagueById } from "./src/shared/leagues";
 import { buildSessions } from "./src/shared/sessions";
 import type { Settings } from "./src/shared/types";
-import { scanClientLog } from "./src/main/services/logScanner";
+import { LogScanCache } from "./src/main/services/logScanCache";
+import { loadCachedClientLog, scanClientLog, type ClientLogScan } from "./src/main/services/logScanner";
 import { PriceCache } from "./src/main/services/priceCache";
 import { DEFAULT_LOG_PATH, defaultSettings } from "./src/main/services/settings";
 import { checkForUpdate, getAppInfo } from "./src/main/services/updateCheck";
@@ -28,6 +29,7 @@ export default defineConfig({
 function browserPreviewApi() {
   const userDataPath = path.join(process.cwd(), ".cache", "browser-preview");
   const priceCache = new PriceCache(userDataPath);
+  const logScanCache = new LogScanCache(userDataPath);
 
   return {
     name: "browser-preview-api",
@@ -74,17 +76,19 @@ function browserPreviewApi() {
             const body = await readJsonBody<{ filePath?: string; settings?: Settings }>(request);
             const settings = body.settings ?? defaultSettings();
             const filePath = body.filePath || settings.logPath || DEFAULT_LOG_PATH;
-            const result = await scanClientLog(filePath);
+            const result = await scanClientLog(filePath, { cache: logScanCache });
 
-            sendJson(response, {
-              filePath,
-              fileSize: result.fileSize,
-              scannedAt: new Date().toISOString(),
-              draws: result.draws,
-              sessions: buildSessions(result.draws, null, settings.sessionLeagueOverrides, {
-                profitFilters: settings.profitFilters
-              })
-            });
+            sendJson(response, createPreviewScanResult(filePath, result, settings));
+            return;
+          }
+
+          if (request.method === "POST" && url.pathname === "/__poe-preview/cached-scan") {
+            const body = await readJsonBody<{ filePath?: string; settings?: Settings }>(request);
+            const settings = body.settings ?? defaultSettings();
+            const filePath = body.filePath || settings.logPath || DEFAULT_LOG_PATH;
+            const result = await loadCachedClientLog(filePath, logScanCache);
+
+            sendJson(response, result ? createPreviewScanResult(filePath, result, settings) : null);
             return;
           }
 
@@ -96,6 +100,21 @@ function browserPreviewApi() {
         }
       });
     }
+  };
+}
+
+function createPreviewScanResult(filePath: string, result: ClientLogScan, settings: Settings) {
+  return {
+    filePath,
+    fileSize: result.fileSize,
+    scannedAt: result.scannedAt,
+    scanMode: result.scanMode,
+    bytesScanned: result.bytesScanned,
+    cachedBytes: result.cachedBytes,
+    draws: result.draws,
+    sessions: buildSessions(result.draws, null, settings.sessionLeagueOverrides, {
+      profitFilters: settings.profitFilters
+    })
   };
 }
 

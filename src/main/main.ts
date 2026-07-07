@@ -4,8 +4,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHALLENGE_LEAGUES, getLeagueById } from "../shared/leagues.js";
 import { buildSessions } from "../shared/sessions.js";
-import type { Settings } from "../shared/types.js";
-import { scanClientLog } from "./services/logScanner.js";
+import type { ScanResult, Settings } from "../shared/types.js";
+import { AutoScanController } from "./services/autoScan.js";
+import { LogScanCache } from "./services/logScanCache.js";
+import { loadCachedClientLog, scanClientLog, type ClientLogScan } from "./services/logScanner.js";
 import { PriceCache } from "./services/priceCache.js";
 import { DEFAULT_LOG_PATH, loadSettings, saveSettings } from "./services/settings.js";
 import { checkForUpdate, getAppInfo } from "./services/updateCheck.js";
@@ -44,6 +46,8 @@ async function createWindow(): Promise<void> {
 function registerIpc(): void {
   const userDataPath = app.getPath("userData");
   const priceCache = new PriceCache(userDataPath);
+  const logScanCache = new LogScanCache(userDataPath);
+  const autoScanController = new AutoScanController<ScanResult>();
 
   ipcMain.handle("settings:load", () => loadSettings(userDataPath));
 
@@ -61,20 +65,62 @@ function registerIpc(): void {
   });
 
   ipcMain.handle("log:scan", async (event, filePath: string, settings: Settings) => {
-    const result = await scanClientLog(filePath, (progress) => {
-      event.sender.send("log:scan-progress", progress);
+    const result = await scanClientLog(filePath, {
+      cache: logScanCache,
+      onProgress: (progress) => {
+        event.sender.send("log:scan-progress", progress);
+      }
     });
 
-    return {
-      filePath,
-      fileSize: result.fileSize,
-      scannedAt: new Date().toISOString(),
-      draws: result.draws,
-      sessions: buildSessions(result.draws, null, settings.sessionLeagueOverrides, {
-        profitFilters: settings.profitFilters
-      })
-    };
+    return createScanResult(filePath, result, settings);
   });
+
+  ipcMain.handle("log:load-cache", async (_event, filePath: string, settings: Settings) => {
+    const result = await loadCachedClientLog(filePath, logScanCache);
+    return result ? createScanResult(filePath, result, settings) : null;
+  });
+
+  ipcMain.handle("log:auto-scan:configure", (event, filePath: string, settings: Settings) => {
+    if (!settings.autoScanEnabled) {
+      autoScanController.stop();
+      return false;
+    }
+
+    const sender = event.sender;
+    autoScanController.configure({
+      filePath,
+      scan: async () => {
+        const result = await scanClientLog(filePath, {
+          cache: logScanCache,
+          onProgress: (progress) => {
+            if (!sender.isDestroyed()) {
+              sender.send("log:scan-progress", progress);
+            }
+          }
+        });
+        return createScanResult(filePath, result, settings);
+      },
+      onResult: (result) => {
+        if (!sender.isDestroyed()) {
+          sender.send("log:auto-scan-result", result);
+        }
+      },
+      onError: (message) => {
+        if (!sender.isDestroyed()) {
+          sender.send("log:auto-scan-error", message);
+        }
+      }
+    });
+
+    return true;
+  });
+
+  ipcMain.handle("log:auto-scan:stop", () => {
+    autoScanController.stop();
+    return true;
+  });
+
+  app.on("before-quit", () => autoScanController.stop());
 
   ipcMain.handle("prices:get", async (_event, leagueId: string, forceRefresh = false) => {
     return priceCache.getPrices(getLeagueById(leagueId), forceRefresh);
@@ -112,6 +158,21 @@ function registerIpc(): void {
   ipcMain.handle("app:check-update", () => checkForUpdate(app.getVersion()));
 
   ipcMain.handle("app:leagues", () => CHALLENGE_LEAGUES);
+}
+
+function createScanResult(filePath: string, result: ClientLogScan, settings: Settings): ScanResult {
+  return {
+    filePath,
+    fileSize: result.fileSize,
+    scannedAt: result.scannedAt,
+    scanMode: result.scanMode,
+    bytesScanned: result.bytesScanned,
+    cachedBytes: result.cachedBytes,
+    draws: result.draws,
+    sessions: buildSessions(result.draws, null, settings.sessionLeagueOverrides, {
+      profitFilters: settings.profitFilters
+    })
+  };
 }
 
 function configureExternalNavigation(window: BrowserWindow): void {
