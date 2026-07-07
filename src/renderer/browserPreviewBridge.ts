@@ -144,12 +144,7 @@ export function installBrowserPreviewBridge(): void {
 
       autoScanTimer = window.setTimeout(() => {
         autoScanTimer = null;
-        emitAutoScanResult({
-          ...createFallbackScanResult(filePath, currentSettings),
-          scanMode: "cached",
-          bytesScanned: 0,
-          cachedBytes: 2400
-        });
+        void runPreviewAutoScan(filePath, currentSettings);
       }, 300);
 
       return true;
@@ -202,6 +197,29 @@ export function installBrowserPreviewBridge(): void {
       return () => autoScanErrorListeners.delete(listener);
     }
   };
+}
+
+async function runPreviewAutoScan(filePath: string, currentSettings: Settings): Promise<void> {
+  emitProgress(initialScanProgress());
+
+  try {
+    const result = await postPreviewJson<ScanResult>("/scan", { filePath, settings: currentSettings }).catch(() => ({
+      ...createFallbackScanResult(filePath, currentSettings),
+      scanMode: "cached" as const,
+      bytesScanned: 0,
+      cachedBytes: 2400
+    }));
+
+    emitProgress({
+      bytesRead: result.fileSize,
+      totalBytes: result.fileSize,
+      linesRead: 0,
+      drawsFound: result.draws.length
+    });
+    emitAutoScanResult(result);
+  } catch (error) {
+    emitAutoScanError(error instanceof Error ? error.message : "Automatic scan failed.");
+  }
 }
 
 function loadSavedSettings(): Partial<Settings> {
