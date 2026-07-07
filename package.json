@@ -1,0 +1,65 @@
+{
+  "name": "poe-stacked-deck-counter",
+  "version": "0.1.0",
+  "description": "Electron app for counting Path of Exile stacked deck openings from Client.txt.",
+  "author": "C-Pettersson",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "dev": "npm run build && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",
+    "build": "npm run typecheck && vite build && tsc -p tsconfig.node.json",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "test": "vitest run",
+    "pack": "npm run build && cross-env ELECTRON_BUILDER_CACHE=.cache/electron-builder electron-builder --dir",
+    "dist": "npm run build && cross-env ELECTRON_BUILDER_CACHE=.cache/electron-builder electron-builder",
+    "release": "release-it"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.4.1",
+    "lucide-react": "^0.475.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@release-it/conventional-changelog": "^11.0.1",
+    "@types/node": "^22.13.4",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^34.1.1",
+    "electron-builder": "^25.1.8",
+    "release-it": "^18.1.2",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0",
+    "vitest": "^3.0.5",
+    "wait-on": "^8.0.2"
+  },
+  "build": {
+    "appId": "com.cpettersson.poe-stacked-deck-counter",
+    "productName": "PoE Stacked Deck Counter",
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "C-Pettersson",
+        "repo": "poe-stacked-deck-counter"
+      }
+    ]
+  }
+}
