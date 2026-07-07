@@ -13,6 +13,7 @@
     "test": "vitest run",
     "pack": "npm run build && cross-env ELECTRON_BUILDER_CACHE=.cache/electron-builder electron-builder --dir",
     "dist": "npm run build && cross-env ELECTRON_BUILDER_CACHE=.cache/electron-builder electron-builder",
+    "dist:publish": "npm run build && cross-env ELECTRON_BUILDER_CACHE=.cache/electron-builder electron-builder --publish always",
     "release": "release-it"
   },
   "dependencies": {
