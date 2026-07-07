@@ -5,10 +5,15 @@ import type { ClientLogDraw, DeckSession, PriceSnapshot, SessionCard } from "./t
 export const SESSION_GAP_MS = 2 * 60 * 60 * 1000;
 type PriceSource = PriceSnapshot | Record<string, PriceSnapshot> | null;
 
+interface BuildSessionsOptions {
+  pricingLeagueId?: string;
+}
+
 export function buildSessions(
   draws: ClientLogDraw[],
   priceSnapshot: PriceSource,
-  overrides: Record<string, string> = {}
+  overrides: Record<string, string> = {},
+  options: BuildSessionsOptions = {}
 ): DeckSession[] {
   const sorted = [...draws].sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
   const groups: ClientLogDraw[][] = [];
@@ -34,7 +39,7 @@ export function buildSessions(
     const overrideLeague = overrides[temporaryId] ? getLeagueById(overrides[temporaryId]) : null;
     const league = overrideLeague ?? autoLeague;
     const source = overrideLeague ? "manual" : "auto";
-    const priced = selectSnapshot(priceSnapshot, league.id);
+    const priced = selectSnapshot(priceSnapshot, options.pricingLeagueId ?? league.id);
     const cards = buildSessionCards(group, priced);
     const totalValueChaos = cards.reduce((total, card) => total + (card.totalChaos ?? 0), 0);
     const stackedDeckCostChaos = (priced?.stackedDeck?.chaosValue ?? 0) * group.length;

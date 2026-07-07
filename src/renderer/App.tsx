@@ -94,10 +94,10 @@ export function App(): ReactElement {
 
   const sessions = useMemo(
     () =>
-      buildSessions(scanResult?.draws ?? [], priceSnapshots, settings?.sessionLeagueOverrides ?? {}).sort(
-        (a, b) => Date.parse(b.startAt) - Date.parse(a.startAt)
-      ),
-    [priceSnapshots, scanResult?.draws, settings?.sessionLeagueOverrides]
+      buildSessions(scanResult?.draws ?? [], priceSnapshots, settings?.sessionLeagueOverrides ?? {}, {
+        pricingLeagueId: settings?.selectedLeagueId
+      }).sort((a, b) => Date.parse(b.startAt) - Date.parse(a.startAt)),
+    [priceSnapshots, scanResult?.draws, settings?.selectedLeagueId, settings?.sessionLeagueOverrides]
   );
 
   const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? sessions[0] ?? null;
@@ -176,23 +176,16 @@ export function App(): ReactElement {
 
     const nextSettings = {
       ...settings,
-      selectedLeagueId: leagueId,
       sessionLeagueOverrides: {
         ...settings.sessionLeagueOverrides,
         [session.id]: leagueId
       }
     };
     await updateSettings(nextSettings);
-    await loadPrices(leagueId, false);
   }
 
-  async function changeDataLeagueFilter(filterId: DataLeagueFilterId): Promise<void> {
+  function changeDataLeagueFilter(filterId: DataLeagueFilterId): void {
     setDataLeagueFilterId(filterId);
-
-    const leagueId = getLeagueIdFromDataFilter(filterId);
-    if (leagueId && !priceSnapshots[leagueId]) {
-      await loadPrices(leagueId, false);
-    }
   }
 
   async function copyPayload(payload: { title: string; text: string }): Promise<void> {
@@ -307,7 +300,7 @@ export function App(): ReactElement {
           sessions={sessions}
           selectedSession={selectedSession}
           leagueFilterId={dataLeagueFilterId}
-          onLeagueFilterChange={(filterId) => void changeDataLeagueFilter(filterId)}
+          onLeagueFilterChange={changeDataLeagueFilter}
         />
       ) : null}
 
@@ -460,7 +453,7 @@ function SessionsTab(props: {
             {props.selectedSession.missingPrices > 0 ? (
               <div className="warning">
                 <AlertTriangle size={18} />
-                <span>{props.selectedSession.missingPrices} cards have no price in the selected league cache.</span>
+                <span>{props.selectedSession.missingPrices} cards have no price in the selected price league cache.</span>
               </div>
             ) : null}
 
