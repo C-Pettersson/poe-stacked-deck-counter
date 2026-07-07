@@ -23,6 +23,15 @@ export function formatPercent(value: number | null | undefined): string {
   return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
+export function formatDropRate(count: number, total: number): string {
+  if (total <= 0) {
+    return "-";
+  }
+
+  const percent = (count / total) * 100;
+  return `${count.toLocaleString()}/${total.toLocaleString()} (${percent.toFixed(2)}%)`;
+}
+
 export function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",

@@ -17,7 +17,14 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { CHALLENGE_LEAGUES, LEAGUE_SOURCE_URL, getLeagueById } from "../shared/leagues.js";
-import { formatChaos, formatDateRange, formatDateTime, formatPercent, formatSignedChaos } from "../shared/format.js";
+import {
+  formatChaos,
+  formatDateRange,
+  formatDateTime,
+  formatDropRate,
+  formatPercent,
+  formatSignedChaos
+} from "../shared/format.js";
 import { buildSessions, rollupCards } from "../shared/sessions.js";
 import {
   createCsv,
@@ -397,6 +404,7 @@ function SessionsTab(props: {
                   <div>
                     <h3>{card.name}</h3>
                     <p>{card.count} opened</p>
+                    <p>Drop rate {formatDropRate(card.count, props.selectedSession!.totalCards)}</p>
                   </div>
                   <strong>{formatChaos(card.totalChaos)}</strong>
                   <small>
@@ -423,6 +431,8 @@ function DataTab({
   cards: ReturnType<typeof rollupCards>;
   selectedSession: DeckSession | null;
 }): ReactElement {
+  const totalCards = selectedSession?.totalCards ?? sessions.reduce((total, session) => total + session.totalCards, 0);
+
   return (
     <section className="data-panel">
       <div className="detail-header">
@@ -438,6 +448,7 @@ function DataTab({
             <tr>
               <th>Card</th>
               <th>Count</th>
+              <th>Drop Rate</th>
               <th>Price</th>
               <th>Total</th>
               <th>7d</th>
@@ -448,6 +459,7 @@ function DataTab({
               <tr key={card.name}>
                 <td>{card.name}</td>
                 <td>{card.count.toLocaleString()}</td>
+                <td>{formatDropRate(card.count, totalCards)}</td>
                 <td>{formatChaos(card.priceChaos)}</td>
                 <td>{formatChaos(card.totalChaos)}</td>
                 <td>{formatPercent(card.change7d)}</td>
