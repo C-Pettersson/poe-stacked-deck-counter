@@ -111,12 +111,27 @@ export function installBrowserPreviewBridge(): void {
 
       return result;
     },
-    loadCachedScan: async (filePath, currentSettings) => ({
-      ...createFallbackScanResult(filePath, currentSettings),
-      scanMode: "restored",
-      bytesScanned: 0,
-      cachedBytes: 2400
-    }),
+    loadCachedScan: async (filePath, currentSettings) => {
+      const cachedResult = await postPreviewJson<ScanResult | null>("/cached-scan", {
+        filePath,
+        settings: currentSettings
+      }).catch(() => null);
+
+      if (cachedResult) {
+        return cachedResult;
+      }
+
+      if (filePath === previewSettings.logPath) {
+        return {
+          ...createFallbackScanResult(filePath, currentSettings),
+          scanMode: "restored",
+          bytesScanned: 0,
+          cachedBytes: 2400
+        };
+      }
+
+      return null;
+    },
     configureAutoScan: async (filePath, currentSettings) => {
       if (autoScanTimer !== null) {
         window.clearTimeout(autoScanTimer);
@@ -151,6 +166,10 @@ export function installBrowserPreviewBridge(): void {
       getPreviewJson<PriceSnapshot>(`/prices?leagueId=${encodeURIComponent(leagueId)}&forceRefresh=${forceRefresh}`).catch(
         () => createPreviewSnapshot(leagueId)
       ),
+    clearPriceCache: async () => {
+      await postPreviewJson<{ ok: boolean }>("/price-cache/clear", {}).catch(() => undefined);
+      return true;
+    },
     copyText: async (text) => {
       await navigator.clipboard?.writeText(text).catch(() => undefined);
       return true;

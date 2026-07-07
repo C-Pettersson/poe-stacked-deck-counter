@@ -22,6 +22,7 @@ const api = {
   stopAutoScan: (): Promise<boolean> => ipcRenderer.invoke("log:auto-scan:stop"),
   getPrices: (leagueId: string, forceRefresh = false): Promise<PriceSnapshot> =>
     ipcRenderer.invoke("prices:get", leagueId, forceRefresh),
+  clearPriceCache: (): Promise<boolean> => ipcRenderer.invoke("prices:clear-cache"),
   copyText: (text: string): Promise<boolean> => ipcRenderer.invoke("clipboard:write", text),
   saveTextFile: (defaultFileName: string, content: string): Promise<string | null> =>
     ipcRenderer.invoke("file:save-text", defaultFileName, content),

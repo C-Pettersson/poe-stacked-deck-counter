@@ -130,6 +130,11 @@ function registerIpc(): void {
     return priceCache.getPrices(getLeagueById(leagueId), forceRefresh);
   });
 
+  ipcMain.handle("prices:clear-cache", async () => {
+    await priceCache.clear();
+    return true;
+  });
+
   ipcMain.handle("clipboard:write", (_event, text: string) => {
     clipboard.writeText(text);
     return true;

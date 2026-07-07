@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createPriceSnapshot, cardPricesUrl, isSnapshotFresh, stackedDeckUrl } from "../../shared/pricing.js";
 import type { CurrencyOverview, ExchangeOverview } from "../../shared/pricing.js";
@@ -33,6 +33,10 @@ export class PriceCache {
 
       throw error;
     }
+  }
+
+  async clear(): Promise<void> {
+    await rm(this.cacheDir, { recursive: true, force: true });
   }
 
   private async readSnapshot(leagueId: string): Promise<PriceSnapshot | null> {

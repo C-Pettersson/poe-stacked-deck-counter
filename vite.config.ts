@@ -72,6 +72,12 @@ function browserPreviewApi() {
             return;
           }
 
+          if (request.method === "POST" && url.pathname === "/__poe-preview/price-cache/clear") {
+            await priceCache.clear();
+            sendJson(response, { ok: true });
+            return;
+          }
+
           if (request.method === "POST" && url.pathname === "/__poe-preview/scan") {
             const body = await readJsonBody<{ filePath?: string; settings?: Settings }>(request);
             const settings = body.settings ?? defaultSettings();

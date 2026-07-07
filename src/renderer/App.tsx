@@ -16,9 +16,10 @@ import {
   Save,
   Settings as SettingsIcon,
   Share2,
-  Table2
+  Table2,
+  Trash2
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactElement } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { CHALLENGE_LEAGUES, LEAGUE_SOURCE_URL, getLeagueById } from "../shared/leagues.js";
 import { formatDateRange, formatDateTime, formatDropRate, formatPercent } from "../shared/format.js";
 import { buildSessions, rollupCards, updateSessionLeagueOverrides } from "../shared/sessions.js";
@@ -83,6 +84,7 @@ export function App(): ReactElement {
   const [scanProgress, setScanProgress] = useState<ScanProgress>(initialProgress);
   const [isScanning, setIsScanning] = useState(false);
   const [isCheckingForUpdate, setIsCheckingForUpdate] = useState(false);
+  const [isClearingPriceCache, setIsClearingPriceCache] = useState(false);
   const [priceSnapshots, setPriceSnapshots] = useState<Record<string, PriceSnapshot>>({});
   const [priceStatus, setPriceStatus] = useState("No price cache loaded");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -90,13 +92,13 @@ export function App(): ReactElement {
   const [notice, setNotice] = useState<string | null>(null);
   const [appUpdateInfo, setAppUpdateInfo] = useState<AppUpdateInfo | null>(null);
   const [appUpdateStatus, setAppUpdateStatus] = useState("Update status has not been checked.");
+  const scanResultVersionRef = useRef(0);
 
   useEffect(() => {
     const unsubscribe = window.poeDeck.onScanProgress(setScanProgress);
     const unsubscribeAutoScanResult = window.poeDeck.onAutoScanResult((result) => {
-      setScanResult(result);
-      setSelectedSessionId(null);
-      setNotice(createScanNotice(result, "Auto scan found"));
+      beginScanResultUpdate();
+      applyScanResult(result, "Auto scan found");
     });
     const unsubscribeAutoScanError = window.poeDeck.onAutoScanError((message) => {
       setNotice(`Automatic scan failed: ${message}`);
@@ -128,22 +130,19 @@ export function App(): ReactElement {
     }
 
     let isCurrent = true;
+    const scanResultVersion = beginScanResultUpdate();
 
     void window.poeDeck
       .loadCachedScan(settings.logPath, settings)
       .then((cachedResult) => {
-        if (!isCurrent) {
+        if (!isCurrent || !isCurrentScanResultUpdate(scanResultVersion)) {
           return;
         }
 
-        setScanResult(cachedResult);
-        setSelectedSessionId(null);
-        if (cachedResult) {
-          setNotice(createScanNotice(cachedResult, "Restored"));
-        }
+        applyScanResult(cachedResult, "Restored");
       })
       .catch(() => {
-        if (isCurrent) {
+        if (isCurrent && isCurrentScanResultUpdate(scanResultVersion)) {
           setScanResult(null);
           setSelectedSessionId(null);
         }
@@ -230,14 +229,19 @@ export function App(): ReactElement {
     setIsScanning(true);
     setNotice(null);
     setScanProgress(initialProgress);
+    const scanResultVersion = beginScanResultUpdate();
 
     try {
       const result = await window.poeDeck.scanLog(settings.logPath, settings);
-      setScanResult(result);
-      setSelectedSessionId(null);
-      setNotice(createScanNotice(result, "Found"));
+      if (!isCurrentScanResultUpdate(scanResultVersion)) {
+        return;
+      }
+
+      applyScanResult(result, "Found");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Scan failed.");
+      if (isCurrentScanResultUpdate(scanResultVersion)) {
+        setNotice(error instanceof Error ? error.message : "Scan failed.");
+      }
     } finally {
       setIsScanning(false);
     }
@@ -254,6 +258,21 @@ export function App(): ReactElement {
       );
     } catch (error) {
       setPriceStatus(error instanceof Error ? error.message : "Price refresh failed.");
+    }
+  }
+
+  async function clearPriceCache(): Promise<void> {
+    setIsClearingPriceCache(true);
+    setPriceStatus("Clearing price cache...");
+
+    try {
+      await window.poeDeck.clearPriceCache();
+      setPriceSnapshots({});
+      setPriceStatus("Price cache cleared.");
+    } catch (error) {
+      setPriceStatus(error instanceof Error ? error.message : "Price cache clear failed.");
+    } finally {
+      setIsClearingPriceCache(false);
     }
   }
 
@@ -342,6 +361,24 @@ export function App(): ReactElement {
 
   function changeDataLeagueFilter(filterId: DataLeagueFilterId): void {
     setDataLeagueFilterId(filterId);
+  }
+
+  function beginScanResultUpdate(): number {
+    scanResultVersionRef.current += 1;
+    return scanResultVersionRef.current;
+  }
+
+  function isCurrentScanResultUpdate(version: number): boolean {
+    return version === scanResultVersionRef.current;
+  }
+
+  function applyScanResult(result: ScanResult | null, noticePrefix: string): void {
+    setScanResult(result);
+    setSelectedSessionId(null);
+
+    if (result) {
+      setNotice(createScanNotice(result, noticePrefix));
+    }
   }
 
   async function copyPayload(payload: { title: string; text: string }): Promise<void> {
@@ -497,10 +534,12 @@ export function App(): ReactElement {
           appInfo={appInfo}
           appUpdateInfo={appUpdateInfo}
           appUpdateStatus={appUpdateStatus}
+          isClearingPriceCache={isClearingPriceCache}
           isCheckingForUpdate={isCheckingForUpdate}
           settings={settings}
           priceSnapshots={priceSnapshots}
           onCheckForUpdate={() => void checkForAppUpdate()}
+          onClearPriceCache={() => void clearPriceCache()}
           onChooseLog={() => void chooseLogFile()}
           onOpen={(url) => void window.poeDeck.openExternal(url)}
           onAutoScanChange={(autoScanEnabled) => void changeAutoScanEnabled(autoScanEnabled)}
@@ -900,10 +939,12 @@ function SettingsTab(props: {
   appInfo: AppInfo | null;
   appUpdateInfo: AppUpdateInfo | null;
   appUpdateStatus: string;
+  isClearingPriceCache: boolean;
   isCheckingForUpdate: boolean;
   settings: Settings;
   priceSnapshots: Record<string, PriceSnapshot>;
   onCheckForUpdate: () => void;
+  onClearPriceCache: () => void;
   onChooseLog: () => void;
   onOpen: (url: string) => void;
   onAutoScanChange: (enabled: boolean) => void;
@@ -1003,12 +1044,27 @@ function SettingsTab(props: {
       <article className="settings-card">
         <h2>Prices</h2>
         <p>{snapshot ? `${snapshot.leagueName} cache expires ${formatDateTime(snapshot.expiresAt)}` : "No cache loaded"}</p>
-        {snapshot ? (
-          <button type="button" onClick={() => props.onOpen(snapshot.sourceUrls.cards)}>
-            <ExternalLink size={17} />
-            <span>poe.ninja</span>
+        <div className="settings-actions">
+          {snapshot ? (
+            <button type="button" onClick={() => props.onOpen(snapshot.sourceUrls.cards)}>
+              <ExternalLink size={17} />
+              <span>poe.ninja</span>
+            </button>
+          ) : null}
+          <button
+            aria-busy={props.isClearingPriceCache}
+            type="button"
+            onClick={props.onClearPriceCache}
+            disabled={props.isClearingPriceCache}
+          >
+            {props.isClearingPriceCache ? (
+              <LoaderCircle aria-hidden="true" className="spin-icon" size={17} />
+            ) : (
+              <Trash2 size={17} />
+            )}
+            <span>{props.isClearingPriceCache ? "Clearing..." : "Clear Cache"}</span>
           </button>
-        ) : null}
+        </div>
       </article>
       <article className="settings-card">
         <h2>App Updates</h2>
