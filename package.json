@@ -59,7 +59,8 @@
       {
         "provider": "github",
         "owner": "C-Pettersson",
-        "repo": "poe-stacked-deck-counter"
+        "repo": "poe-stacked-deck-counter",
+        "releaseType": "release"
       }
     ]
   }
