@@ -53,13 +53,17 @@ function registerIpc(): void {
 
   ipcMain.handle("settings:save", (_event, settings: Settings) => saveSettings(userDataPath, settings));
 
-  ipcMain.handle("dialog:choose-log", async () => {
-    const result = await dialog.showOpenDialog({
+  ipcMain.handle("dialog:choose-log", async (event) => {
+    const options: Electron.OpenDialogOptions = {
       title: "Select Path of Exile Client.txt",
       defaultPath: DEFAULT_LOG_PATH,
       properties: ["openFile"],
       filters: [{ name: "Text logs", extensions: ["txt", "log"] }]
-    });
+    };
+    const browserWindow = BrowserWindow.fromWebContents(event.sender);
+    const result = browserWindow
+      ? await dialog.showOpenDialog(browserWindow, options)
+      : await dialog.showOpenDialog(options);
 
     return result.canceled ? null : result.filePaths[0];
   });
@@ -170,6 +174,7 @@ function createScanResult(filePath: string, result: ClientLogScan, settings: Set
     cachedBytes: result.cachedBytes,
     draws: result.draws,
     sessions: buildSessions(result.draws, null, settings.sessionLeagueOverrides, {
+      fixedStackedDeckPriceChaos: settings.fixedStackedDeckPriceChaos,
       profitFilters: settings.profitFilters
     })
   };

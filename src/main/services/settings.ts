@@ -13,6 +13,7 @@ export function defaultSettings(): Settings {
     selectedLeagueId: getDefaultLeague().id,
     currencyMode: DEFAULT_CURRENCY_MODE,
     autoScanEnabled: false,
+    fixedStackedDeckPriceChaos: null,
     profitFilters: DEFAULT_PROFIT_FILTERS,
     sessionLeagueOverrides: {}
   };
@@ -29,6 +30,7 @@ export async function loadSettings(userDataPath: string): Promise<Settings> {
       ...saved,
       currencyMode: saved.currencyMode === "chaos" ? "chaos" : DEFAULT_CURRENCY_MODE,
       autoScanEnabled: saved.autoScanEnabled === true,
+      fixedStackedDeckPriceChaos: normalizeOptionalChaosPrice(saved.fixedStackedDeckPriceChaos),
       profitFilters: normalizeProfitFilters(saved.profitFilters),
       sessionLeagueOverrides: saved.sessionLeagueOverrides ?? {}
     };
@@ -45,4 +47,8 @@ export async function saveSettings(userDataPath: string, settings: Settings): Pr
 
 function getSettingsPath(userDataPath: string): string {
   return path.join(userDataPath, "settings.json");
+}
+
+function normalizeOptionalChaosPrice(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 }

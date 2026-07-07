@@ -20,6 +20,7 @@ const previewSettings: Settings = {
   selectedLeagueId: "mirage",
   currencyMode: "auto",
   autoScanEnabled: false,
+  fixedStackedDeckPriceChaos: null,
   profitFilters: DEFAULT_PROFIT_FILTERS,
   sessionLeagueOverrides: {}
 };
@@ -93,7 +94,7 @@ export function installBrowserPreviewBridge(): void {
       localStorage.setItem("poeDeckPreviewSettings", JSON.stringify(settings));
       return settings;
     },
-    chooseLogFile: async () => null,
+    chooseLogFile: choosePreviewLogFile,
     scanLog: async (filePath, currentSettings) => {
       emitProgress(initialScanProgress());
 
@@ -202,9 +203,68 @@ function mergeSettings(serverSettings: Settings, savedSettings: Partial<Settings
         : serverSettings.logPath,
     currencyMode: savedSettings.currencyMode === "chaos" ? "chaos" : serverSettings.currencyMode ?? previewSettings.currencyMode,
     autoScanEnabled: savedSettings.autoScanEnabled === true,
+    fixedStackedDeckPriceChaos: normalizeOptionalChaosPrice(
+      Object.hasOwn(savedSettings, "fixedStackedDeckPriceChaos")
+        ? savedSettings.fixedStackedDeckPriceChaos
+        : serverSettings.fixedStackedDeckPriceChaos
+    ),
     profitFilters: normalizeProfitFilters(savedSettings.profitFilters ?? serverSettings.profitFilters),
     sessionLeagueOverrides: savedSettings.sessionLeagueOverrides ?? serverSettings.sessionLeagueOverrides
   };
+}
+
+function choosePreviewLogFile(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".txt,.log,text/plain";
+    input.tabIndex = -1;
+    input.style.position = "fixed";
+    input.style.left = "-10000px";
+    input.style.top = "0";
+    input.style.opacity = "0";
+
+    let isSettled = false;
+    let focusTimer: number | null = null;
+
+    const finish = (filePath: string | null): void => {
+      if (isSettled) {
+        return;
+      }
+
+      isSettled = true;
+      if (focusTimer !== null) {
+        window.clearTimeout(focusTimer);
+      }
+      input.removeEventListener("change", onChange);
+      input.removeEventListener("cancel", onCancel);
+      window.removeEventListener("focus", onWindowFocus);
+      input.remove();
+      resolve(filePath);
+    };
+
+    const onChange = (): void => {
+      const file = input.files?.[0] ?? null;
+      finish(file ? file.name : null);
+    };
+
+    const onCancel = (): void => finish(null);
+
+    const onWindowFocus = (): void => {
+      focusTimer = window.setTimeout(() => {
+        focusTimer = null;
+        if (!input.files?.length) {
+          finish(null);
+        }
+      }, 300);
+    };
+
+    input.addEventListener("change", onChange);
+    input.addEventListener("cancel", onCancel);
+    document.body.append(input);
+    window.setTimeout(() => window.addEventListener("focus", onWindowFocus, { once: true }), 0);
+    input.click();
+  });
 }
 
 function initialScanProgress(): ScanProgress {
@@ -226,9 +286,14 @@ function createFallbackScanResult(filePath: string, currentSettings: Settings): 
     cachedBytes: 0,
     draws: previewDraws,
     sessions: buildSessions(previewDraws, null, currentSettings.sessionLeagueOverrides, {
+      fixedStackedDeckPriceChaos: currentSettings.fixedStackedDeckPriceChaos,
       profitFilters: currentSettings.profitFilters
     })
   };
+}
+
+function normalizeOptionalChaosPrice(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 async function getPreviewJson<T>(path: string): Promise<T> {

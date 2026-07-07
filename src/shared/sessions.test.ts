@@ -34,6 +34,40 @@ describe("buildSessions", () => {
     expect(sessions[0].profitChaos).toBe(0);
   });
 
+  it("uses a fixed stacked deck price when one is configured", () => {
+    const sessions = buildSessions(
+      [makeDraw("2025-11-01T12:07:45Z", "The Lover"), makeDraw("2025-11-01T12:07:46Z", "The Lover")],
+      {
+        mirage: makeSnapshot("mirage", "Mirage", 10, 2)
+      },
+      {},
+      {
+        fixedStackedDeckPriceChaos: 1.5,
+        pricingLeagueId: "mirage"
+      }
+    );
+
+    expect(sessions[0].stackedDeckCostChaos).toBe(3);
+    expect(sessions[0].profitChaos).toBe(17);
+  });
+
+  it("allows a fixed zero stacked deck price", () => {
+    const sessions = buildSessions(
+      [makeDraw("2025-11-01T12:07:45Z", "The Lover")],
+      {
+        mirage: makeSnapshot("mirage", "Mirage", 10, 2)
+      },
+      {},
+      {
+        fixedStackedDeckPriceChaos: 0,
+        pricingLeagueId: "mirage"
+      }
+    );
+
+    expect(sessions[0].stackedDeckCostChaos).toBe(0);
+    expect(sessions[0].profitChaos).toBe(10);
+  });
+
   it("excludes cards below the minimum card value from profit", () => {
     const sessions = buildSessions(
       [makeDraw("2025-11-01T12:07:45Z", "The Lover")],

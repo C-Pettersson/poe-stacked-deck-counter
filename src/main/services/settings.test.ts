@@ -15,6 +15,10 @@ describe("settings", () => {
     expect(defaultSettings().autoScanEnabled).toBe(false);
   });
 
+  it("defaults fixed stacked deck pricing to automatic", () => {
+    expect(defaultSettings().fixedStackedDeckPriceChaos).toBeNull();
+  });
+
   it("round-trips automatic scanning through persisted settings", async () => {
     const userDataPath = await createTempDir();
     const savedSettings = await saveSettings(userDataPath, {
@@ -25,6 +29,18 @@ describe("settings", () => {
 
     expect(savedSettings.autoScanEnabled).toBe(true);
     expect(loadedSettings.autoScanEnabled).toBe(true);
+  });
+
+  it("round-trips a fixed stacked deck price through persisted settings", async () => {
+    const userDataPath = await createTempDir();
+    const savedSettings = await saveSettings(userDataPath, {
+      ...defaultSettings(),
+      fixedStackedDeckPriceChaos: 1.7
+    });
+    const loadedSettings = await loadSettings(userDataPath);
+
+    expect(savedSettings.fixedStackedDeckPriceChaos).toBe(1.7);
+    expect(loadedSettings.fixedStackedDeckPriceChaos).toBe(1.7);
   });
 });
 

@@ -171,15 +171,29 @@ export function App(): ReactElement {
       isCurrent = false;
       void window.poeDeck.stopAutoScan().catch(() => undefined);
     };
-  }, [settings?.autoScanEnabled, settings?.logPath, settings?.profitFilters, settings?.sessionLeagueOverrides]);
+  }, [
+    settings?.autoScanEnabled,
+    settings?.fixedStackedDeckPriceChaos,
+    settings?.logPath,
+    settings?.profitFilters,
+    settings?.sessionLeagueOverrides
+  ]);
 
   const sessions = useMemo(
     () =>
       buildSessions(scanResult?.draws ?? [], priceSnapshots, settings?.sessionLeagueOverrides ?? {}, {
+        fixedStackedDeckPriceChaos: settings?.fixedStackedDeckPriceChaos,
         pricingLeagueId: settings?.selectedLeagueId,
         profitFilters: settings?.profitFilters
       }).sort((a, b) => Date.parse(b.startAt) - Date.parse(a.startAt)),
-    [priceSnapshots, scanResult?.draws, settings?.profitFilters, settings?.selectedLeagueId, settings?.sessionLeagueOverrides]
+    [
+      priceSnapshots,
+      scanResult?.draws,
+      settings?.fixedStackedDeckPriceChaos,
+      settings?.profitFilters,
+      settings?.selectedLeagueId,
+      settings?.sessionLeagueOverrides
+    ]
   );
 
   const selectedSession = resolveSelectedSession(sessions, selectedSessionId);
@@ -293,6 +307,14 @@ export function App(): ReactElement {
     }
 
     await updateSettings({ ...settings, autoScanEnabled });
+  }
+
+  async function changeFixedStackedDeckPrice(fixedStackedDeckPriceChaos: Settings["fixedStackedDeckPriceChaos"]): Promise<void> {
+    if (!settings) {
+      return;
+    }
+
+    await updateSettings({ ...settings, fixedStackedDeckPriceChaos });
   }
 
   async function changeSessionLeague(session: DeckSession, leagueId: string): Promise<void> {
@@ -474,6 +496,9 @@ export function App(): ReactElement {
           onChooseLog={() => void chooseLogFile()}
           onOpen={(url) => void window.poeDeck.openExternal(url)}
           onAutoScanChange={(autoScanEnabled) => void changeAutoScanEnabled(autoScanEnabled)}
+          onFixedStackedDeckPriceChange={(fixedStackedDeckPriceChaos) =>
+            void changeFixedStackedDeckPrice(fixedStackedDeckPriceChaos)
+          }
           onProfitFiltersChange={(profitFilters) => void changeProfitFilters(profitFilters)}
         />
       ) : null}
@@ -874,6 +899,7 @@ function SettingsTab(props: {
   onChooseLog: () => void;
   onOpen: (url: string) => void;
   onAutoScanChange: (enabled: boolean) => void;
+  onFixedStackedDeckPriceChange: (fixedStackedDeckPriceChaos: Settings["fixedStackedDeckPriceChaos"]) => void;
   onProfitFiltersChange: (profitFilters: Settings["profitFilters"]) => void;
 }): ReactElement {
   const selectedLeague = getLeagueById(props.settings.selectedLeagueId);
@@ -923,7 +949,18 @@ function SettingsTab(props: {
         </button>
       </article>
       <article className="settings-card">
-        <h2>Pricing Option</h2>
+        <h2>Pricing Options</h2>
+        <label className="field-shell">
+          <span>Fixed deck price (chaos)</span>
+          <input
+            min="0"
+            placeholder="Price in chaos"
+            step="0.1"
+            type="number"
+            value={props.settings.fixedStackedDeckPriceChaos ?? ""}
+            onChange={(event) => props.onFixedStackedDeckPriceChange(parseOptionalChaosInput(event.target.value))}
+          />
+        </label>
         <label className="field-shell">
           <span>Minimum value per card</span>
           <input
@@ -1099,6 +1136,15 @@ function getDataFilterTitle(filterId: DataLeagueFilterId): string {
 function parseChaosInput(value: string): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function parseOptionalChaosInput(value: string): number | null {
+  if (value.trim() === "") {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
 function getCardExclusionLabel(reason: NonNullable<DeckSession["cards"][number]["exclusionReason"]>): string {

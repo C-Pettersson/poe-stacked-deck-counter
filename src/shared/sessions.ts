@@ -8,6 +8,7 @@ type PriceSource = PriceSnapshot | Record<string, PriceSnapshot> | null;
 
 interface BuildSessionsOptions {
   pricingLeagueId?: string;
+  fixedStackedDeckPriceChaos?: number | null;
   profitFilters?: ProfitFilters;
 }
 
@@ -46,7 +47,7 @@ export function buildSessions(
     const priced = selectSnapshot(priceSnapshot, pricingLeagueId);
     const cards = buildSessionCards(group, priced, profitFilters);
     const totalValueChaos = cards.reduce((total, card) => total + (card.includedValueChaos ?? 0), 0);
-    const stackedDeckCostChaos = (priced?.stackedDeck?.chaosValue ?? 0) * group.length;
+    const stackedDeckCostChaos = getStackedDeckPriceChaos(priced, options.fixedStackedDeckPriceChaos) * group.length;
     const missingPrices = cards.filter((card) => card.priceChaos === null).length;
 
     return {
@@ -85,6 +86,14 @@ function selectSnapshot(source: PriceSource, leagueId: string): PriceSnapshot | 
 
 function isPriceSnapshot(source: PriceSnapshot | Record<string, PriceSnapshot>): source is PriceSnapshot {
   return "leagueId" in source && "cards" in source && "fetchedAt" in source;
+}
+
+function getStackedDeckPriceChaos(snapshot: PriceSnapshot | null, fixedPriceChaos: number | null | undefined): number {
+  if (typeof fixedPriceChaos === "number" && Number.isFinite(fixedPriceChaos) && fixedPriceChaos >= 0) {
+    return fixedPriceChaos;
+  }
+
+  return snapshot?.stackedDeck?.chaosValue ?? 0;
 }
 
 export function createSessionId(startAt: string, index: number): string {

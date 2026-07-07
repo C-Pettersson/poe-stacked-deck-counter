@@ -130,6 +130,7 @@ export interface Settings {
   selectedLeagueId: string;
   currencyMode: CurrencyMode;
   autoScanEnabled: boolean;
+  fixedStackedDeckPriceChaos: number | null;
   profitFilters: ProfitFilters;
   sessionLeagueOverrides: Record<string, string>;
 }
