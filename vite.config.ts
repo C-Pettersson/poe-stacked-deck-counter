@@ -4,6 +4,7 @@ import { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import packageJson from "./package.json";
 import { CHALLENGE_LEAGUES, getLeagueById } from "./src/shared/leagues";
+import { normalizePriceSourceOptions } from "./src/shared/priceSources";
 import { buildSessions } from "./src/shared/sessions";
 import type { Settings } from "./src/shared/types";
 import { LogScanCache } from "./src/main/services/logScanCache";
@@ -68,7 +69,11 @@ function browserPreviewApi() {
           if (request.method === "GET" && url.pathname === "/__poe-preview/prices") {
             const leagueId = url.searchParams.get("leagueId") ?? getLeagueById(defaultSettings().selectedLeagueId).id;
             const forceRefresh = url.searchParams.get("forceRefresh") === "true";
-            sendJson(response, await priceCache.getPrices(getLeagueById(leagueId), forceRefresh));
+            const options = normalizePriceSourceOptions({
+              mode: url.searchParams.get("priceSourceMode"),
+              priority: url.searchParams.get("priceSourcePriority")
+            });
+            sendJson(response, await priceCache.getPrices(getLeagueById(leagueId), options, forceRefresh));
             return;
           }
 

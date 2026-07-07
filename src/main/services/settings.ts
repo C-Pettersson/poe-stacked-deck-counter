@@ -2,6 +2,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_CURRENCY_MODE } from "../../shared/currencyFormat.js";
 import { getDefaultLeague, isKnownLeagueId } from "../../shared/leagues.js";
+import {
+  DEFAULT_PRICE_SOURCE_MODE,
+  DEFAULT_PRICE_SOURCE_PRIORITY,
+  normalizePriceSource,
+  normalizePriceSourceMode
+} from "../../shared/priceSources.js";
 import { DEFAULT_PROFIT_FILTERS, normalizeProfitFilters } from "../../shared/profitFilters.js";
 import type { Settings } from "../../shared/types.js";
 
@@ -14,6 +20,8 @@ export function defaultSettings(): Settings {
     currencyMode: DEFAULT_CURRENCY_MODE,
     autoScanEnabled: false,
     fixedStackedDeckPriceChaos: null,
+    priceSourceMode: DEFAULT_PRICE_SOURCE_MODE,
+    priceSourcePriority: DEFAULT_PRICE_SOURCE_PRIORITY,
     profitFilters: DEFAULT_PROFIT_FILTERS,
     sessionLeagueOverrides: {}
   };
@@ -32,6 +40,8 @@ export async function loadSettings(userDataPath: string): Promise<Settings> {
       currencyMode: saved.currencyMode === "chaos" ? "chaos" : DEFAULT_CURRENCY_MODE,
       autoScanEnabled: saved.autoScanEnabled === true,
       fixedStackedDeckPriceChaos: normalizeOptionalChaosPrice(saved.fixedStackedDeckPriceChaos),
+      priceSourceMode: normalizePriceSourceMode(saved.priceSourceMode),
+      priceSourcePriority: normalizePriceSource(saved.priceSourcePriority),
       profitFilters: normalizeProfitFilters(saved.profitFilters),
       sessionLeagueOverrides: normalizeSessionLeagueOverrides(saved.sessionLeagueOverrides)
     };

@@ -18,6 +18,8 @@ export function SettingsTab(props: {
   onOpen: (url: string) => void;
   onAutoScanChange: (enabled: boolean) => void;
   onFixedStackedDeckPriceChange: (fixedStackedDeckPriceChaos: Settings["fixedStackedDeckPriceChaos"]) => void;
+  onPriceSourceModeChange: (priceSourceMode: Settings["priceSourceMode"]) => void;
+  onPriceSourcePriorityChange: (priceSourcePriority: Settings["priceSourcePriority"]) => void;
   onProfitFiltersChange: (profitFilters: Settings["profitFilters"]) => void;
 }): ReactElement {
   const selectedLeague = getLeagueById(props.settings.selectedLeagueId);
@@ -69,6 +71,28 @@ export function SettingsTab(props: {
       <article className="settings-card">
         <h2>Pricing Options</h2>
         <label className="field-shell">
+          <span>Price source</span>
+          <select
+            value={props.settings.priceSourceMode}
+            onChange={(event) => props.onPriceSourceModeChange(event.target.value as Settings["priceSourceMode"])}
+          >
+            <option value="hybrid">Hybrid</option>
+            <option value="poe-watch">poe.watch only</option>
+            <option value="poe-ninja">poe.ninja only</option>
+          </select>
+        </label>
+        <label className="field-shell">
+          <span>Priority source</span>
+          <select
+            value={props.settings.priceSourcePriority}
+            onChange={(event) => props.onPriceSourcePriorityChange(event.target.value as Settings["priceSourcePriority"])}
+            disabled={props.settings.priceSourceMode !== "hybrid"}
+          >
+            <option value="poe-watch">poe.watch</option>
+            <option value="poe-ninja">poe.ninja</option>
+          </select>
+        </label>
+        <label className="field-shell">
           <span>Fixed deck price (chaos)</span>
           <input
             min="0"
@@ -100,13 +124,18 @@ export function SettingsTab(props: {
           />
         </label>
         <label className="field-shell">
-          <span>Minimum confidence</span>
+          <span>Price confidence</span>
           <select
-            value={filters.requireConfidence ? "required" : "any"}
-            onChange={(event) => updateProfitFilters({ requireConfidence: event.target.value === "required" })}
+            value={filters.confidenceFilter}
+            onChange={(event) =>
+              updateProfitFilters({ confidenceFilter: event.target.value as Settings["profitFilters"]["confidenceFilter"] })
+            }
           >
             <option value="any">Any price</option>
-            <option value="required">Ignore without confidence</option>
+            <option value="exclude-low">Exclude low confidence</option>
+            <option value="high-only">High only</option>
+            <option value="low-only">Low only</option>
+            <option value="unknown-only">Unknown only</option>
           </select>
         </label>
       </article>
@@ -117,7 +146,7 @@ export function SettingsTab(props: {
           {snapshot ? (
             <button type="button" onClick={() => props.onOpen(snapshot.sourceUrls.cards)}>
               <ExternalLink size={17} />
-              <span>poe.ninja</span>
+              <span>{formatSnapshotSource(snapshot)}</span>
             </button>
           ) : null}
           <button
@@ -165,6 +194,18 @@ export function SettingsTab(props: {
       </article>
     </section>
   );
+}
+
+function formatSnapshotSource(snapshot: PriceSnapshot): string {
+  if (snapshot.priceSourceMode === "hybrid") {
+    return `Hybrid: ${formatPriceSource(snapshot.priceSourcePriority)}`;
+  }
+
+  return formatPriceSource(snapshot.priceSourceMode);
+}
+
+function formatPriceSource(source: "poe-watch" | "poe-ninja"): string {
+  return source === "poe-watch" ? "poe.watch" : "poe.ninja";
 }
 
 function parseChaosInput(value: string): number {

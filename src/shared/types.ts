@@ -1,6 +1,10 @@
 export type AppTab = "sessions" | "data" | "settings";
 export type CurrencyDenomination = "chaos" | "divine";
 export type CurrencyMode = "auto" | "chaos";
+export type ConfidenceFilter = "any" | "exclude-low" | "high-only" | "low-only" | "unknown-only";
+export type PriceConfidence = "high" | "low" | "unknown";
+export type PriceSource = "poe-watch" | "poe-ninja";
+export type PriceSourceMode = "hybrid" | PriceSource;
 export type ScanMode = "full" | "incremental" | "cached" | "restored";
 export type SessionCardExclusionReason = "card-value" | "stack-value" | "confidence";
 
@@ -69,6 +73,8 @@ export interface SessionCard {
   includedValueChaos?: number | null;
   exclusionReason?: SessionCardExclusionReason;
   hasPriceConfidence?: boolean;
+  priceConfidence?: PriceConfidence;
+  priceSource?: PriceSource;
   detailsId?: string;
   icon?: string;
   change7d?: number | null;
@@ -81,6 +87,8 @@ export interface CardPrice {
   chaosValue: number;
   volumeChaosValue?: number;
   hasConfidence?: boolean;
+  confidence: PriceConfidence;
+  source: PriceSource;
   change7d?: number | null;
   icon?: string;
 }
@@ -90,13 +98,22 @@ export interface CurrencyPrice {
   name: string;
   detailsId: string;
   chaosValue: number;
+  confidence: PriceConfidence;
+  source: PriceSource;
   icon?: string;
+}
+
+export interface PriceSourceOptions {
+  mode: PriceSourceMode;
+  priority: PriceSource;
 }
 
 export interface PriceSnapshot {
   leagueId: string;
   leagueName: string;
   poeNinjaLeague: string;
+  priceSourceMode: PriceSourceMode;
+  priceSourcePriority: PriceSource;
   fetchedAt: string;
   expiresAt: string;
   cards: Record<string, CardPrice>;
@@ -108,6 +125,8 @@ export interface PriceSnapshot {
   sourceUrls: {
     cards: string;
     stackedDeck: string;
+    fallbackCards?: string;
+    fallbackStackedDeck?: string;
   };
   fromCache: boolean;
 }
@@ -131,6 +150,8 @@ export interface Settings {
   currencyMode: CurrencyMode;
   autoScanEnabled: boolean;
   fixedStackedDeckPriceChaos: number | null;
+  priceSourceMode: PriceSourceMode;
+  priceSourcePriority: PriceSource;
   profitFilters: ProfitFilters;
   sessionLeagueOverrides: Record<string, string>;
 }
@@ -138,7 +159,7 @@ export interface Settings {
 export interface ProfitFilters {
   minimumCardValueChaos: number;
   minimumStackValueChaos: number;
-  requireConfidence: boolean;
+  confidenceFilter: ConfidenceFilter;
 }
 
 export interface SharePayload {

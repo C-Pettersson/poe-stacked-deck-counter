@@ -84,6 +84,8 @@ export function App(): ReactElement {
           onFixedStackedDeckPriceChange={(fixedStackedDeckPriceChaos) =>
             void app.changeFixedStackedDeckPrice(fixedStackedDeckPriceChaos)
           }
+          onPriceSourceModeChange={(priceSourceMode) => void app.changePriceSourceMode(priceSourceMode)}
+          onPriceSourcePriorityChange={(priceSourcePriority) => void app.changePriceSourcePriority(priceSourcePriority)}
           onProfitFiltersChange={(profitFilters) => void app.changeProfitFilters(profitFilters)}
         />
       ) : null}

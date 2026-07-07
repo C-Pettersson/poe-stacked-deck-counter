@@ -2,6 +2,13 @@ import packageJson from "../../package.json";
 import { APP_RELEASES_URL } from "../shared/appUpdate.js";
 import { DEFAULT_CURRENCY_ICONS } from "../shared/currencyIcons.js";
 import { CHALLENGE_LEAGUES, getLeagueById } from "../shared/leagues.js";
+import {
+  DEFAULT_PRICE_SOURCE_MODE,
+  DEFAULT_PRICE_SOURCE_PRIORITY,
+  normalizePriceSource,
+  normalizePriceSourceMode
+} from "../shared/priceSources.js";
+import { sourceUrlsFor } from "../shared/pricing.js";
 import { DEFAULT_PROFIT_FILTERS, normalizeProfitFilters } from "../shared/profitFilters.js";
 import { buildSessions } from "../shared/sessions.js";
 import type {
@@ -10,6 +17,7 @@ import type {
   ClientLogDraw,
   LeagueInfo,
   PriceSnapshot,
+  PriceSourceOptions,
   ScanProgress,
   ScanResult,
   Settings
@@ -21,6 +29,8 @@ const previewSettings: Settings = {
   currencyMode: "auto",
   autoScanEnabled: false,
   fixedStackedDeckPriceChaos: null,
+  priceSourceMode: DEFAULT_PRICE_SOURCE_MODE,
+  priceSourcePriority: DEFAULT_PRICE_SOURCE_PRIORITY,
   profitFilters: DEFAULT_PROFIT_FILTERS,
   sessionLeagueOverrides: {}
 };
@@ -157,10 +167,12 @@ export function installBrowserPreviewBridge(): void {
 
       return true;
     },
-    getPrices: async (leagueId, forceRefresh = false) =>
-      getPreviewJson<PriceSnapshot>(`/prices?leagueId=${encodeURIComponent(leagueId)}&forceRefresh=${forceRefresh}`).catch(
-        () => createPreviewSnapshot(leagueId)
-      ),
+    getPrices: async (leagueId, options, forceRefresh = false) =>
+      getPreviewJson<PriceSnapshot>(
+        `/prices?leagueId=${encodeURIComponent(leagueId)}&forceRefresh=${forceRefresh}&priceSourceMode=${encodeURIComponent(
+          options.mode
+        )}&priceSourcePriority=${encodeURIComponent(options.priority)}`
+      ).catch(() => createPreviewSnapshot(leagueId, options)),
     clearPriceCache: async () => {
       await postPreviewJson<{ ok: boolean }>("/price-cache/clear", {}).catch(() => undefined);
       return true;
@@ -245,6 +257,8 @@ function mergeSettings(serverSettings: Settings, savedSettings: Partial<Settings
         ? savedSettings.fixedStackedDeckPriceChaos
         : serverSettings.fixedStackedDeckPriceChaos
     ),
+    priceSourceMode: normalizePriceSourceMode(savedSettings.priceSourceMode ?? serverSettings.priceSourceMode),
+    priceSourcePriority: normalizePriceSource(savedSettings.priceSourcePriority ?? serverSettings.priceSourcePriority),
     profitFilters: normalizeProfitFilters(savedSettings.profitFilters ?? serverSettings.profitFilters),
     sessionLeagueOverrides: savedSettings.sessionLeagueOverrides ?? serverSettings.sessionLeagueOverrides
   };
@@ -378,27 +392,29 @@ function emitAutoScanError(message: string): void {
   }
 }
 
-function createPreviewSnapshot(leagueId: string): PriceSnapshot {
+function createPreviewSnapshot(leagueId: string, options: PriceSourceOptions): PriceSnapshot {
   const league = getLeagueById(leagueId);
   const fetchedAt = new Date().toISOString();
   const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+  const source = options.mode === "hybrid" ? options.priority : options.mode;
 
   return {
     leagueId: league.id,
     leagueName: league.name,
     poeNinjaLeague: league.poeNinjaName,
+    priceSourceMode: options.mode,
+    priceSourcePriority: options.priority,
     fetchedAt,
     expiresAt,
     fromCache: true,
-    sourceUrls: {
-      cards: `https://poe.ninja/poe1/economy/${league.poeNinjaSlug}/divination-cards`,
-      stackedDeck: `https://poe.ninja/poe1/economy/${league.poeNinjaSlug}/currency/stacked-deck`
-    },
+    sourceUrls: sourceUrlsFor(league, source),
     stackedDeck: {
       id: "stacked-deck",
       name: "Stacked Deck",
       detailsId: "stacked-deck",
-      chaosValue: 2.4
+      chaosValue: 2.4,
+      confidence: "high",
+      source
     },
     currency: {
       chaos: {
@@ -406,6 +422,8 @@ function createPreviewSnapshot(leagueId: string): PriceSnapshot {
         name: "Chaos Orb",
         detailsId: "chaos-orb",
         chaosValue: 1,
+        confidence: "high",
+        source,
         icon: DEFAULT_CURRENCY_ICONS.chaos.icon
       },
       divine: {
@@ -413,6 +431,8 @@ function createPreviewSnapshot(leagueId: string): PriceSnapshot {
         name: "Divine Orb",
         detailsId: "divine-orb",
         chaosValue: 210,
+        confidence: "high",
+        source,
         icon: DEFAULT_CURRENCY_ICONS.divine.icon
       }
     },
@@ -424,6 +444,8 @@ function createPreviewSnapshot(leagueId: string): PriceSnapshot {
         chaosValue: 0.3,
         volumeChaosValue: 0.25,
         hasConfidence: false,
+        confidence: "low",
+        source,
         change7d: -2.1,
         icon: PREVIEW_DIVINATION_ICON
       },
@@ -434,6 +456,8 @@ function createPreviewSnapshot(leagueId: string): PriceSnapshot {
         chaosValue: 0.5,
         volumeChaosValue: 0.4,
         hasConfidence: true,
+        confidence: "high",
+        source,
         change7d: 1.4
       },
       "the hoarder": {
@@ -443,6 +467,8 @@ function createPreviewSnapshot(leagueId: string): PriceSnapshot {
         chaosValue: 8,
         volumeChaosValue: 7.5,
         hasConfidence: true,
+        confidence: "high",
+        source,
         change7d: 4.7,
         icon: PREVIEW_DIVINATION_ICON
       },
@@ -453,6 +479,8 @@ function createPreviewSnapshot(leagueId: string): PriceSnapshot {
         chaosValue: 1260,
         volumeChaosValue: 1200,
         hasConfidence: true,
+        confidence: "high",
+        source,
         change7d: 8.2,
         icon: PREVIEW_DIVINATION_ICON
       },
@@ -463,6 +491,8 @@ function createPreviewSnapshot(leagueId: string): PriceSnapshot {
         chaosValue: 120,
         volumeChaosValue: 110,
         hasConfidence: true,
+        confidence: "high",
+        source,
         change7d: 3.5
       }
     }

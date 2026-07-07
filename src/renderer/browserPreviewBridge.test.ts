@@ -9,6 +9,8 @@ const settings: Settings = {
   currencyMode: "auto",
   autoScanEnabled: true,
   fixedStackedDeckPriceChaos: 5,
+  priceSourceMode: "hybrid",
+  priceSourcePriority: "poe-watch",
   profitFilters: DEFAULT_PROFIT_FILTERS,
   sessionLeagueOverrides: {}
 };

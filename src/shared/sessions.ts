@@ -1,6 +1,6 @@
 import { getLeagueById, isKnownLeagueId, matchLeagueByDate } from "./leagues.js";
 import { getCardPrice } from "./pricing.js";
-import { DEFAULT_PROFIT_FILTERS, getIncludedValueChaos, hasCardPriceConfidence } from "./profitFilters.js";
+import { DEFAULT_PROFIT_FILTERS, getCardPriceConfidence, getIncludedValueChaos } from "./profitFilters.js";
 import type { ClientLogDraw, DeckSession, PriceSnapshot, ProfitFilters, SessionCard } from "./types.js";
 
 export const SESSION_GAP_MS = 2 * 60 * 60 * 1000;
@@ -161,8 +161,9 @@ function buildSessionCards(
       const price = getCardPrice(snapshot, name);
       const priceChaos = price?.chaosValue ?? null;
       const totalChaos = price ? price.chaosValue * count : null;
-      const hasPriceConfidence = price ? hasCardPriceConfidence(price) : undefined;
-      const included = getIncludedValueChaos({ priceChaos, totalChaos, hasPriceConfidence }, profitFilters);
+      const priceConfidence = price ? getCardPriceConfidence(price) : undefined;
+      const hasPriceConfidence = price ? priceConfidence === "high" : undefined;
+      const included = getIncludedValueChaos({ priceChaos, totalChaos, hasPriceConfidence, priceConfidence }, profitFilters);
 
       return {
         name,
@@ -172,6 +173,8 @@ function buildSessionCards(
         includedValueChaos: included.valueChaos,
         exclusionReason: included.reason,
         hasPriceConfidence,
+        priceConfidence,
+        priceSource: price?.source,
         detailsId: price?.detailsId,
         icon: price?.icon,
         change7d: price?.change7d ?? null

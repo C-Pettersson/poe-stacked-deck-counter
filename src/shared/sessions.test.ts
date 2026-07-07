@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSessions, updateSessionLeagueOverrides } from "./sessions.js";
-import type { ClientLogDraw, PriceSnapshot } from "./types.js";
+import type { ClientLogDraw, PriceConfidence, PriceSnapshot } from "./types.js";
 
 describe("buildSessions", () => {
   it("prices sessions with the selected price league instead of the dated session league", () => {
@@ -131,7 +131,7 @@ describe("buildSessions", () => {
         profitFilters: {
           minimumCardValueChaos: 5,
           minimumStackValueChaos: 0,
-          requireConfidence: false
+          confidenceFilter: "any"
         }
       }
     );
@@ -158,7 +158,7 @@ describe("buildSessions", () => {
         profitFilters: {
           minimumCardValueChaos: 0,
           minimumStackValueChaos: 7,
-          requireConfidence: false
+          confidenceFilter: "any"
         }
       }
     );
@@ -173,7 +173,7 @@ describe("buildSessions", () => {
     expect(sessions[0].profitChaos).toBe(-2);
   });
 
-  it("excludes cards without price confidence when required", () => {
+  it("excludes cards without high price confidence when required", () => {
     const sessions = buildSessions(
       [makeDraw("2025-11-01T12:07:45Z", "The Lover")],
       {
@@ -185,7 +185,7 @@ describe("buildSessions", () => {
         profitFilters: {
           minimumCardValueChaos: 0,
           minimumStackValueChaos: 0,
-          requireConfidence: true
+          confidenceFilter: "high-only"
         }
       }
     );
@@ -199,6 +199,39 @@ describe("buildSessions", () => {
     });
     expect(sessions[0].totalValueChaos).toBe(0);
     expect(sessions[0].profitChaos).toBe(-2);
+  });
+
+  it.each([
+    ["any", "low", 10],
+    ["exclude-low", "low", 0],
+    ["exclude-low", "unknown", 10],
+    ["high-only", "high", 10],
+    ["high-only", "unknown", 0],
+    ["low-only", "low", 10],
+    ["low-only", "high", 0],
+    ["unknown-only", "unknown", 10],
+    ["unknown-only", "low", 0]
+  ] as const)("applies the %s confidence filter to %s confidence prices", (confidenceFilter, confidence, includedValueChaos) => {
+    const sessions = buildSessions(
+      [makeDraw("2025-11-01T12:07:45Z", "The Lover")],
+      {
+        mirage: makeSnapshot("mirage", "Mirage", 10, 2, undefined, confidence)
+      },
+      {},
+      {
+        pricingLeagueId: "mirage",
+        profitFilters: {
+          minimumCardValueChaos: 0,
+          minimumStackValueChaos: 0,
+          confidenceFilter
+        }
+      }
+    );
+
+    expect(sessions[0].cards[0]).toMatchObject({
+      includedValueChaos,
+      priceConfidence: confidence
+    });
   });
 });
 
@@ -216,12 +249,15 @@ function makeSnapshot(
   leagueName: string,
   cardChaos: number,
   deckChaos: number,
-  volumeCardChaos?: number
+  volumeCardChaos?: number,
+  confidence: PriceConfidence = "low"
 ): PriceSnapshot {
   return {
     leagueId,
     leagueName,
     poeNinjaLeague: leagueName,
+    priceSourceMode: "poe-ninja",
+    priceSourcePriority: "poe-ninja",
     fetchedAt: "2026-07-07T10:00:00Z",
     expiresAt: "2026-07-07T22:00:00Z",
     fromCache: false,
@@ -233,7 +269,9 @@ function makeSnapshot(
       id: "stacked-deck",
       name: "Stacked Deck",
       detailsId: "stacked-deck",
-      chaosValue: deckChaos
+      chaosValue: deckChaos,
+      confidence: "high",
+      source: "poe-ninja"
     },
     cards: {
       "the lover": {
@@ -241,7 +279,10 @@ function makeSnapshot(
         name: "The Lover",
         detailsId: "the-lover",
         chaosValue: cardChaos,
-        volumeChaosValue: volumeCardChaos
+        volumeChaosValue: volumeCardChaos,
+        hasConfidence: confidence === "high",
+        confidence,
+        source: "poe-ninja"
       }
     }
   };

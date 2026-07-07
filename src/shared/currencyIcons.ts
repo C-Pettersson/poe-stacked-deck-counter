@@ -1,4 +1,4 @@
-import type { CurrencyDenomination, CurrencyPrice, PriceSnapshot } from "./types.js";
+import type { CurrencyDenomination, CurrencyPrice, PriceConfidence, PriceSnapshot, PriceSource } from "./types.js";
 
 export interface CurrencyIconInfo {
   denomination: CurrencyDenomination;
@@ -41,13 +41,19 @@ export function getDivineChaosValue(snapshot: PriceSnapshot | null | undefined):
   return getValidChaosValue(snapshot?.currency?.divine?.chaosValue);
 }
 
-export function createDefaultCurrencyPrice(denomination: CurrencyDenomination): CurrencyPrice {
+export function createDefaultCurrencyPrice(
+  denomination: CurrencyDenomination,
+  source: PriceSource = "poe-ninja",
+  confidence: PriceConfidence = denomination === "chaos" ? "high" : "unknown"
+): CurrencyPrice {
   const icon = DEFAULT_CURRENCY_ICONS[denomination];
   return {
     id: icon.detailsId,
     name: icon.name,
     detailsId: icon.detailsId,
     chaosValue: denomination === "chaos" ? 1 : 0,
+    confidence,
+    source,
     icon: icon.icon
   };
 }

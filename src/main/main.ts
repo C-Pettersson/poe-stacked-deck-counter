@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHALLENGE_LEAGUES, getLeagueById } from "../shared/leagues.js";
+import { normalizePriceSourceOptions } from "../shared/priceSources.js";
 import { buildSessions } from "../shared/sessions.js";
 import type { ScanResult, Settings } from "../shared/types.js";
 import { AutoScanController } from "./services/autoScan.js";
@@ -126,8 +127,8 @@ function registerIpc(): void {
 
   app.on("before-quit", () => autoScanController.stop());
 
-  ipcMain.handle("prices:get", async (_event, leagueId: string, forceRefresh = false) => {
-    return priceCache.getPrices(getLeagueById(leagueId), forceRefresh);
+  ipcMain.handle("prices:get", async (_event, leagueId: string, options: unknown, forceRefresh = false) => {
+    return priceCache.getPrices(getLeagueById(leagueId), normalizePriceSourceOptions(options), forceRefresh);
   });
 
   ipcMain.handle("prices:clear-cache", async () => {

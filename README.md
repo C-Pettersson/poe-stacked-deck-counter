@@ -1,6 +1,6 @@
 # PoE Stacked Deck Counter
 
-Electron and TypeScript app for scanning Path of Exile `Client.txt`, grouping stacked deck openings into sessions, pricing the cards with poe.ninja, and exporting share text or poe.how draft JSON.
+Electron and TypeScript app for scanning Path of Exile `Client.txt`, grouping stacked deck openings into sessions, pricing the cards with poe.watch and poe.ninja, and exporting share text or poe.how draft JSON.
 
 ## Features
 
@@ -8,8 +8,8 @@ Electron and TypeScript app for scanning Path of Exile `Client.txt`, grouping st
 - Detects `Card drawn from the deck` entries in both single-line and wrapped two-line forms.
 - Groups openings into sessions when more than 2 hours pass between draws.
 - Maps sessions to Path of Exile challenge leagues from the PoE Wiki league date table, with manual override in the UI.
-- Fetches and caches divination card prices and Stacked Deck price from poe.ninja.
-- Filters low-value or untrusted card prices out of value and profit calculations.
+- Fetches and caches divination card prices and Stacked Deck price from poe.watch, poe.ninja, or hybrid source priority.
+- Filters low-value or selected confidence levels out of value and profit calculations.
 - Provides Sessions, Data, and Settings tabs with Discord, Reddit, CSV, and poe.how draft sharing.
 - Uses release-it with Conventional Commits and GitHub release publishing.
 
@@ -20,7 +20,7 @@ This project is designed to stay on the passive, read-only side of Path of Exile
 What this app does:
 
 - Reads a `Client.txt` path selected by the user and parses already-written `Card drawn from the deck` log entries.
-- Fetches pricing data from poe.ninja and caches it locally in the app user-data folder.
+- Fetches pricing data from poe.watch and poe.ninja and caches it locally in the app user-data folder.
 - Copies or exports share text only when the user clicks the relevant UI action.
 
 What this app does not do:

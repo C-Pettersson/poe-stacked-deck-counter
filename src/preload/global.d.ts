@@ -3,6 +3,7 @@ import type {
   AppUpdateInfo,
   LeagueInfo,
   PriceSnapshot,
+  PriceSourceOptions,
   ScanProgress,
   ScanResult,
   Settings
@@ -18,7 +19,7 @@ declare global {
       loadCachedScan: (filePath: string, settings: Settings) => Promise<ScanResult | null>;
       configureAutoScan: (filePath: string, settings: Settings) => Promise<boolean>;
       stopAutoScan: () => Promise<boolean>;
-      getPrices: (leagueId: string, forceRefresh?: boolean) => Promise<PriceSnapshot>;
+      getPrices: (leagueId: string, options: PriceSourceOptions, forceRefresh?: boolean) => Promise<PriceSnapshot>;
       clearPriceCache: () => Promise<boolean>;
       copyText: (text: string) => Promise<boolean>;
       saveTextFile: (defaultFileName: string, content: string) => Promise<string | null>;

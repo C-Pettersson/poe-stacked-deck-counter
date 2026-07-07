@@ -19,6 +19,13 @@ describe("settings", () => {
     expect(defaultSettings().fixedStackedDeckPriceChaos).toBeNull();
   });
 
+  it("defaults to hybrid prices with poe.watch priority", () => {
+    expect(defaultSettings()).toMatchObject({
+      priceSourceMode: "hybrid",
+      priceSourcePriority: "poe-watch"
+    });
+  });
+
   it("round-trips automatic scanning through persisted settings", async () => {
     const userDataPath = await createTempDir();
     const savedSettings = await saveSettings(userDataPath, {
@@ -43,6 +50,25 @@ describe("settings", () => {
     expect(loadedSettings.fixedStackedDeckPriceChaos).toBe(1.7);
   });
 
+  it("round-trips price source settings", async () => {
+    const userDataPath = await createTempDir();
+    const savedSettings = await saveSettings(userDataPath, {
+      ...defaultSettings(),
+      priceSourceMode: "poe-ninja",
+      priceSourcePriority: "poe-ninja",
+      profitFilters: {
+        ...defaultSettings().profitFilters,
+        confidenceFilter: "low-only"
+      }
+    });
+    const loadedSettings = await loadSettings(userDataPath);
+
+    expect(savedSettings.priceSourceMode).toBe("poe-ninja");
+    expect(loadedSettings.priceSourceMode).toBe("poe-ninja");
+    expect(loadedSettings.priceSourcePriority).toBe("poe-ninja");
+    expect(loadedSettings.profitFilters.confidenceFilter).toBe("low-only");
+  });
+
   it("normalizes unknown saved league ids", async () => {
     const userDataPath = await createTempDir();
     await writeFile(
@@ -64,6 +90,30 @@ describe("settings", () => {
     expect(loadedSettings.sessionLeagueOverrides).toEqual({
       "session-valid": "keepers"
     });
+  });
+
+  it("normalizes unknown price settings and migrates legacy confidence", async () => {
+    const userDataPath = await createTempDir();
+    await writeFile(
+      path.join(userDataPath, "settings.json"),
+      `${JSON.stringify({
+        ...defaultSettings(),
+        priceSourceMode: "missing-source",
+        priceSourcePriority: "missing-priority",
+        profitFilters: {
+          minimumCardValueChaos: 0,
+          minimumStackValueChaos: 0,
+          requireConfidence: true
+        }
+      })}\n`,
+      "utf8"
+    );
+
+    const loadedSettings = await loadSettings(userDataPath);
+
+    expect(loadedSettings.priceSourceMode).toBe("hybrid");
+    expect(loadedSettings.priceSourcePriority).toBe("poe-watch");
+    expect(loadedSettings.profitFilters.confidenceFilter).toBe("high-only");
   });
 });
 

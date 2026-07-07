@@ -1,9 +1,9 @@
-import type { CardPrice, ProfitFilters, SessionCard, SessionCardExclusionReason } from "./types.js";
+import type { CardPrice, ConfidenceFilter, PriceConfidence, ProfitFilters, SessionCard, SessionCardExclusionReason } from "./types.js";
 
 export const DEFAULT_PROFIT_FILTERS: ProfitFilters = {
   minimumCardValueChaos: 0,
   minimumStackValueChaos: 0,
-  requireConfidence: false
+  confidenceFilter: "any"
 };
 
 export function normalizeProfitFilters(value: unknown): ProfitFilters {
@@ -12,23 +12,35 @@ export function normalizeProfitFilters(value: unknown): ProfitFilters {
   return {
     minimumCardValueChaos: normalizeThreshold(saved.minimumCardValueChaos),
     minimumStackValueChaos: normalizeThreshold(saved.minimumStackValueChaos),
-    requireConfidence: saved.requireConfidence === true
+    confidenceFilter: normalizeConfidenceFilter(saved.confidenceFilter, saved.requireConfidence)
   };
 }
 
 export function hasCardPriceConfidence(price: CardPrice): boolean {
-  return price.hasConfidence ?? isFinitePositiveNumber(price.volumeChaosValue);
+  return getCardPriceConfidence(price) === "high";
+}
+
+export function getCardPriceConfidence(price: Pick<CardPrice, "confidence" | "hasConfidence">): PriceConfidence {
+  if (price.confidence === "high" || price.confidence === "low" || price.confidence === "unknown") {
+    return price.confidence;
+  }
+
+  if (typeof price.hasConfidence === "boolean") {
+    return price.hasConfidence ? "high" : "low";
+  }
+
+  return "unknown";
 }
 
 export function getIncludedValueChaos(
-  card: Pick<SessionCard, "priceChaos" | "totalChaos" | "hasPriceConfidence">,
+  card: Pick<SessionCard, "priceChaos" | "totalChaos" | "hasPriceConfidence" | "priceConfidence">,
   filters: ProfitFilters
 ): { valueChaos: number | null; reason?: SessionCardExclusionReason } {
   if (card.priceChaos === null || card.totalChaos === null) {
     return { valueChaos: null };
   }
 
-  if (filters.requireConfidence && !card.hasPriceConfidence) {
+  if (!isIncludedByConfidence(card.priceConfidence ?? getLegacyConfidence(card.hasPriceConfidence), filters.confidenceFilter)) {
     return { valueChaos: 0, reason: "confidence" };
   }
 
@@ -51,8 +63,46 @@ function normalizeThreshold(value: unknown): number {
   return value;
 }
 
-function isFinitePositiveNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value) && value > 0;
+function normalizeConfidenceFilter(value: unknown, legacyRequireConfidence: unknown): ConfidenceFilter {
+  if (
+    value === "any" ||
+    value === "exclude-low" ||
+    value === "high-only" ||
+    value === "low-only" ||
+    value === "unknown-only"
+  ) {
+    return value;
+  }
+
+  return legacyRequireConfidence === true ? "high-only" : DEFAULT_PROFIT_FILTERS.confidenceFilter;
+}
+
+function isIncludedByConfidence(confidence: PriceConfidence, filter: ConfidenceFilter): boolean {
+  if (filter === "exclude-low") {
+    return confidence !== "low";
+  }
+
+  if (filter === "high-only") {
+    return confidence === "high";
+  }
+
+  if (filter === "low-only") {
+    return confidence === "low";
+  }
+
+  if (filter === "unknown-only") {
+    return confidence === "unknown";
+  }
+
+  return true;
+}
+
+function getLegacyConfidence(hasPriceConfidence: boolean | undefined): PriceConfidence {
+  if (typeof hasPriceConfidence !== "boolean") {
+    return "unknown";
+  }
+
+  return hasPriceConfidence ? "high" : "low";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

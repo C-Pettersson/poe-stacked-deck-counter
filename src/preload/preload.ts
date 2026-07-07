@@ -4,6 +4,7 @@ import type {
   AppUpdateInfo,
   LeagueInfo,
   PriceSnapshot,
+  PriceSourceOptions,
   ScanProgress,
   ScanResult,
   Settings
@@ -20,8 +21,8 @@ const api = {
   configureAutoScan: (filePath: string, settings: Settings): Promise<boolean> =>
     ipcRenderer.invoke("log:auto-scan:configure", filePath, settings),
   stopAutoScan: (): Promise<boolean> => ipcRenderer.invoke("log:auto-scan:stop"),
-  getPrices: (leagueId: string, forceRefresh = false): Promise<PriceSnapshot> =>
-    ipcRenderer.invoke("prices:get", leagueId, forceRefresh),
+  getPrices: (leagueId: string, options: PriceSourceOptions, forceRefresh = false): Promise<PriceSnapshot> =>
+    ipcRenderer.invoke("prices:get", leagueId, options, forceRefresh),
   clearPriceCache: (): Promise<boolean> => ipcRenderer.invoke("prices:clear-cache"),
   copyText: (text: string): Promise<boolean> => ipcRenderer.invoke("clipboard:write", text),
   saveTextFile: (defaultFileName: string, content: string): Promise<string | null> =>
