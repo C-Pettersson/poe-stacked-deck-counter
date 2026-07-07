@@ -21,7 +21,8 @@ body {
 }
 
 button,
-select {
+select,
+input {
   font: inherit;
 }
 
@@ -55,6 +56,16 @@ select {
   border: 1px solid #33424a;
   border-radius: 8px;
   padding: 0 34px 0 12px;
+  color: #f4f7f8;
+  background: #151c21;
+}
+
+input[type="number"] {
+  height: 40px;
+  min-width: 170px;
+  border: 1px solid #33424a;
+  border-radius: 8px;
+  padding: 0 12px;
   color: #f4f7f8;
   background: #151c21;
 }
@@ -101,11 +112,15 @@ p {
   height: 54px;
   border: 1px solid #6f5d33;
   border-radius: 8px;
-  display: grid;
-  place-items: center;
-  background: #2a2419;
-  color: #f0c56c;
-  font-weight: 800;
+  background: #050505;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(240, 197, 108, 0.08);
+}
+
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .brand-block h1 {
@@ -160,6 +175,13 @@ p {
 }
 
 .select-shell {
+  display: grid;
+  gap: 5px;
+  color: #aebec6;
+  font-size: 12px;
+}
+
+.field-shell {
   display: grid;
   gap: 5px;
   color: #aebec6;
@@ -507,6 +529,11 @@ p {
 
 .div-card small {
   grid-column: 1 / -1;
+}
+
+.value-filter-note {
+  margin-left: 8px;
+  color: #f0c56c;
 }
 
 .data-panel {

@@ -1,6 +1,7 @@
 export type AppTab = "sessions" | "data" | "settings";
 export type CurrencyDenomination = "chaos" | "divine";
 export type CurrencyMode = "auto" | "chaos";
+export type SessionCardExclusionReason = "card-value" | "stack-value" | "confidence";
 
 export interface LeagueInfo {
   id: string;
@@ -59,6 +60,9 @@ export interface SessionCard {
   count: number;
   priceChaos: number | null;
   totalChaos: number | null;
+  includedValueChaos?: number | null;
+  exclusionReason?: SessionCardExclusionReason;
+  hasPriceConfidence?: boolean;
   detailsId?: string;
   icon?: string;
   change7d?: number | null;
@@ -70,6 +74,7 @@ export interface CardPrice {
   detailsId: string;
   chaosValue: number;
   volumeChaosValue?: number;
+  hasConfidence?: boolean;
   change7d?: number | null;
   icon?: string;
 }
@@ -105,7 +110,14 @@ export interface Settings {
   logPath: string;
   selectedLeagueId: string;
   currencyMode: CurrencyMode;
+  profitFilters: ProfitFilters;
   sessionLeagueOverrides: Record<string, string>;
+}
+
+export interface ProfitFilters {
+  minimumCardValueChaos: number;
+  minimumStackValueChaos: number;
+  requireConfidence: boolean;
 }
 
 export interface SharePayload {

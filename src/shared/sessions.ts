@@ -1,12 +1,14 @@
 import { getLeagueById, matchLeagueByDate } from "./leagues.js";
 import { getCardPrice } from "./pricing.js";
-import type { ClientLogDraw, DeckSession, PriceSnapshot, SessionCard } from "./types.js";
+import { DEFAULT_PROFIT_FILTERS, getIncludedValueChaos, hasCardPriceConfidence } from "./profitFilters.js";
+import type { ClientLogDraw, DeckSession, PriceSnapshot, ProfitFilters, SessionCard } from "./types.js";
 
 export const SESSION_GAP_MS = 2 * 60 * 60 * 1000;
 type PriceSource = PriceSnapshot | Record<string, PriceSnapshot> | null;
 
 interface BuildSessionsOptions {
   pricingLeagueId?: string;
+  profitFilters?: ProfitFilters;
 }
 
 export function buildSessions(
@@ -40,9 +42,10 @@ export function buildSessions(
     const league = overrideLeague ?? autoLeague;
     const source = overrideLeague ? "manual" : "auto";
     const pricingLeagueId = options.pricingLeagueId ?? league.id;
+    const profitFilters = options.profitFilters ?? DEFAULT_PROFIT_FILTERS;
     const priced = selectSnapshot(priceSnapshot, pricingLeagueId);
-    const cards = buildSessionCards(group, priced);
-    const totalValueChaos = cards.reduce((total, card) => total + (card.totalChaos ?? 0), 0);
+    const cards = buildSessionCards(group, priced, profitFilters);
+    const totalValueChaos = cards.reduce((total, card) => total + (card.includedValueChaos ?? 0), 0);
     const stackedDeckCostChaos = (priced?.stackedDeck?.chaosValue ?? 0) * group.length;
     const missingPrices = cards.filter((card) => card.priceChaos === null).length;
 
@@ -110,7 +113,11 @@ export function rollupCards(sessions: DeckSession[]): SessionCard[] {
   return [...byName.values()].sort((a, b) => (b.totalChaos ?? 0) - (a.totalChaos ?? 0));
 }
 
-function buildSessionCards(draws: ClientLogDraw[], snapshot: PriceSnapshot | null): SessionCard[] {
+function buildSessionCards(
+  draws: ClientLogDraw[],
+  snapshot: PriceSnapshot | null,
+  profitFilters: ProfitFilters
+): SessionCard[] {
   const counts = new Map<string, number>();
 
   for (const draw of draws) {
@@ -120,11 +127,19 @@ function buildSessionCards(draws: ClientLogDraw[], snapshot: PriceSnapshot | nul
   return [...counts.entries()]
     .map(([name, count]) => {
       const price = getCardPrice(snapshot, name);
+      const priceChaos = price?.chaosValue ?? null;
+      const totalChaos = price ? price.chaosValue * count : null;
+      const hasPriceConfidence = price ? hasCardPriceConfidence(price) : undefined;
+      const included = getIncludedValueChaos({ priceChaos, totalChaos, hasPriceConfidence }, profitFilters);
+
       return {
         name,
         count,
-        priceChaos: price?.chaosValue ?? null,
-        totalChaos: price ? price.chaosValue * count : null,
+        priceChaos,
+        totalChaos,
+        includedValueChaos: included.valueChaos,
+        exclusionReason: included.reason,
+        hasPriceConfidence,
         detailsId: price?.detailsId,
         icon: price?.icon,
         change7d: price?.change7d ?? null

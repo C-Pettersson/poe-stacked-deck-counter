@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_CURRENCY_MODE } from "../../shared/currencyFormat.js";
 import { getDefaultLeague } from "../../shared/leagues.js";
+import { DEFAULT_PROFIT_FILTERS, normalizeProfitFilters } from "../../shared/profitFilters.js";
 import type { Settings } from "../../shared/types.js";
 
 export const DEFAULT_LOG_PATH = "C:\\games\\steamapps\\common\\Path of Exile\\logs\\Client.txt";
@@ -11,6 +12,7 @@ export function defaultSettings(): Settings {
     logPath: DEFAULT_LOG_PATH,
     selectedLeagueId: getDefaultLeague().id,
     currencyMode: DEFAULT_CURRENCY_MODE,
+    profitFilters: DEFAULT_PROFIT_FILTERS,
     sessionLeagueOverrides: {}
   };
 }
@@ -25,6 +27,7 @@ export async function loadSettings(userDataPath: string): Promise<Settings> {
       ...defaultSettings(),
       ...saved,
       currencyMode: saved.currencyMode === "chaos" ? "chaos" : DEFAULT_CURRENCY_MODE,
+      profitFilters: normalizeProfitFilters(saved.profitFilters),
       sessionLeagueOverrides: saved.sessionLeagueOverrides ?? {}
     };
   } catch {

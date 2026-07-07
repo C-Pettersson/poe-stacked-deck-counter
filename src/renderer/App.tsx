@@ -32,6 +32,7 @@ import {
 } from "../shared/share.js";
 import type { AppTab, DeckSession, PriceSnapshot, ScanProgress, ScanResult, Settings } from "../shared/types.js";
 import { CurrencyAmount } from "./CurrencyAmount.js";
+import stackedDeckLogo from "./assets/stacked-deck-logo.png";
 import {
   DEFAULT_DATA_SORT,
   getNextDataSort,
@@ -89,9 +90,10 @@ export function App(): ReactElement {
   const sessions = useMemo(
     () =>
       buildSessions(scanResult?.draws ?? [], priceSnapshots, settings?.sessionLeagueOverrides ?? {}, {
-        pricingLeagueId: settings?.selectedLeagueId
+        pricingLeagueId: settings?.selectedLeagueId,
+        profitFilters: settings?.profitFilters
       }).sort((a, b) => Date.parse(b.startAt) - Date.parse(a.startAt)),
-    [priceSnapshots, scanResult?.draws, settings?.selectedLeagueId, settings?.sessionLeagueOverrides]
+    [priceSnapshots, scanResult?.draws, settings?.profitFilters, settings?.selectedLeagueId, settings?.sessionLeagueOverrides]
   );
 
   const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? sessions[0] ?? null;
@@ -171,6 +173,14 @@ export function App(): ReactElement {
     await updateSettings({ ...settings, currencyMode });
   }
 
+  async function changeProfitFilters(profitFilters: Settings["profitFilters"]): Promise<void> {
+    if (!settings) {
+      return;
+    }
+
+    await updateSettings({ ...settings, profitFilters });
+  }
+
   async function changeSessionLeague(session: DeckSession, leagueId: string): Promise<void> {
     if (!settings) {
       return;
@@ -227,7 +237,9 @@ export function App(): ReactElement {
     <main className="app-shell">
       <header className="app-header">
         <div className="brand-block">
-          <div className="brand-mark">SD</div>
+          <div className="brand-mark" aria-hidden="true">
+            <img src={stackedDeckLogo} alt="" />
+          </div>
           <div>
             <h1>PoE Stacked Deck Counter</h1>
             <p>{settings.logPath}</p>
@@ -342,6 +354,7 @@ export function App(): ReactElement {
           priceSnapshots={priceSnapshots}
           onChooseLog={() => void chooseLogFile()}
           onOpen={(url) => void window.poeDeck.openExternal(url)}
+          onProfitFiltersChange={(profitFilters) => void changeProfitFilters(profitFilters)}
         />
       ) : null}
     </main>
@@ -546,6 +559,9 @@ function SessionsTab(props: {
                   <small>
                     <CurrencyAmount mode={props.currencyMode} snapshot={selectedCurrencySnapshot} valueChaos={card.priceChaos} /> each -{" "}
                     {formatPercent(card.change7d)}
+                    {card.exclusionReason ? (
+                      <span className="value-filter-note">{getCardExclusionLabel(card.exclusionReason)}</span>
+                    ) : null}
                   </small>
                 </article>
               ))}
@@ -733,9 +749,18 @@ function SettingsTab(props: {
   priceSnapshots: Record<string, PriceSnapshot>;
   onChooseLog: () => void;
   onOpen: (url: string) => void;
+  onProfitFiltersChange: (profitFilters: Settings["profitFilters"]) => void;
 }): ReactElement {
   const selectedLeague = getLeagueById(props.settings.selectedLeagueId);
   const snapshot = props.priceSnapshots[props.settings.selectedLeagueId];
+  const filters = props.settings.profitFilters;
+
+  function updateProfitFilters(patch: Partial<Settings["profitFilters"]>): void {
+    props.onProfitFiltersChange({
+      ...filters,
+      ...patch
+    });
+  }
 
   return (
     <section className="settings-grid">
@@ -756,6 +781,39 @@ function SettingsTab(props: {
           <ExternalLink size={17} />
           <span>PoE Wiki</span>
         </button>
+      </article>
+      <article className="settings-card">
+        <h2>Pricing Option</h2>
+        <label className="field-shell">
+          <span>Minimum value per card</span>
+          <input
+            min="0"
+            step="0.1"
+            type="number"
+            value={filters.minimumCardValueChaos}
+            onChange={(event) => updateProfitFilters({ minimumCardValueChaos: parseChaosInput(event.target.value) })}
+          />
+        </label>
+        <label className="field-shell">
+          <span>Minimum value per stack</span>
+          <input
+            min="0"
+            step="0.1"
+            type="number"
+            value={filters.minimumStackValueChaos}
+            onChange={(event) => updateProfitFilters({ minimumStackValueChaos: parseChaosInput(event.target.value) })}
+          />
+        </label>
+        <label className="field-shell">
+          <span>Minimum confidence</span>
+          <select
+            value={filters.requireConfidence ? "required" : "any"}
+            onChange={(event) => updateProfitFilters({ requireConfidence: event.target.value === "required" })}
+          >
+            <option value="any">Any price</option>
+            <option value="required">Ignore without confidence</option>
+          </select>
+        </label>
       </article>
       <article className="settings-card">
         <h2>Prices</h2>
@@ -856,6 +914,22 @@ function getDataFilterTitle(filterId: DataLeagueFilterId): string {
 
   const leagueId = getLeagueIdFromDataFilter(filterId);
   return leagueId ? `${getLeagueById(leagueId).name} League` : "All Leagues";
+}
+
+function parseChaosInput(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function getCardExclusionLabel(reason: NonNullable<DeckSession["cards"][number]["exclusionReason"]>): string {
+  switch (reason) {
+    case "card-value":
+      return "ignored: card value";
+    case "stack-value":
+      return "ignored: stack value";
+    case "confidence":
+      return "ignored: no confidence";
+  }
 }
 
 function countSessionsByLeague(sessions: DeckSession[]): Map<string, number> {

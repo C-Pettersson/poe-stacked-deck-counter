@@ -9,6 +9,9 @@ export interface ExchangeOverview {
     id: string;
     primaryValue: number;
     volumePrimaryValue?: number;
+    hasConfidence?: boolean;
+    lowConfidence?: boolean;
+    confidence?: number;
     sparkline?: { totalChange?: number | null };
   }>;
   items: Array<{
@@ -18,16 +21,29 @@ export interface ExchangeOverview {
   }>;
 }
 
+interface CurrencyLine {
+  id?: string;
+  currencyTypeName?: string;
+  detailsId?: string;
+  primaryValue?: number;
+  volumePrimaryValue?: number;
+  chaosEquivalent?: number;
+  receive?: {
+    value?: number;
+  };
+}
+
+interface CurrencyItem {
+  id: string;
+  name: string;
+  image?: string;
+  detailsId: string;
+}
+
 export interface CurrencyOverview {
-  lines: Array<{
-    currencyTypeName: string;
-    detailsId?: string;
-    chaosEquivalent?: number;
-    receive?: {
-      value?: number;
-    };
-  }>;
-  currencyDetails: Array<{
+  lines: CurrencyLine[];
+  items?: CurrencyItem[];
+  currencyDetails?: Array<{
     id: number;
     name: string;
     icon?: string;
@@ -42,7 +58,7 @@ export function cardPricesUrl(leagueName: string): string {
 
 export function stackedDeckUrl(leagueName: string): string {
   const params = new URLSearchParams({ league: leagueName, type: "Currency" });
-  return `${POE_NINJA_BASE}/poe1/api/economy/stash/current/currency/overview?${params.toString()}`;
+  return `${POE_NINJA_BASE}/poe1/api/economy/exchange/current/overview?${params.toString()}`;
 }
 
 export function normalizeCardKey(name: string): string {
@@ -80,6 +96,7 @@ export function createPriceSnapshot(
       detailsId: item.detailsId,
       chaosValue: line.primaryValue,
       volumeChaosValue: line.volumePrimaryValue,
+      hasConfidence: getLineConfidence(line),
       change7d: line.sparkline?.totalChange ?? null,
       icon: CARD_ICON
     };
@@ -111,6 +128,22 @@ export function createPriceSnapshot(
   };
 }
 
+function getLineConfidence(line: ExchangeOverview["lines"][number]): boolean {
+  if (typeof line.hasConfidence === "boolean") {
+    return line.hasConfidence;
+  }
+
+  if (typeof line.lowConfidence === "boolean") {
+    return !line.lowConfidence;
+  }
+
+  if (typeof line.confidence === "number") {
+    return Number.isFinite(line.confidence) && line.confidence > 0;
+  }
+
+  return typeof line.volumePrimaryValue === "number" && Number.isFinite(line.volumePrimaryValue) && line.volumePrimaryValue > 0;
+}
+
 export function getCardPrice(snapshot: PriceSnapshot | null, cardName: string): CardPrice | null {
   if (!snapshot) {
     return null;
@@ -124,21 +157,21 @@ export function isSnapshotFresh(snapshot: PriceSnapshot, now = new Date()): bool
 }
 
 function findStackedDeck(currencyData: CurrencyOverview): CurrencyPrice | null {
-  const line = currencyData.lines.find(
-    (entry) => entry.detailsId === "stacked-deck" || entry.currencyTypeName === "Stacked Deck"
-  );
-  const details = currencyData.currencyDetails.find((entry) => entry.name === "Stacked Deck");
+  const item = findCurrencyItem(currencyData, "stacked-deck", "Stacked Deck");
+  const line = findCurrencyLine(currencyData, "stacked-deck", "Stacked Deck", item);
+  const details = currencyData.currencyDetails?.find((entry) => entry.name === "Stacked Deck");
+  const chaosValue = getLineChaosValue(line);
 
-  if (!line && !details) {
+  if (chaosValue === null) {
     return null;
   }
 
   return {
-    id: "stacked-deck",
-    name: "Stacked Deck",
-    detailsId: line?.detailsId ?? "stacked-deck",
-    chaosValue: line?.chaosEquivalent ?? line?.receive?.value ?? 0,
-    icon: details?.icon
+    id: item?.id ?? "stacked-deck",
+    name: item?.name ?? details?.name ?? "Stacked Deck",
+    detailsId: item?.detailsId ?? line?.detailsId ?? "stacked-deck",
+    chaosValue,
+    icon: getPoeNinjaImageUrl(item?.image) ?? details?.icon
   };
 }
 
@@ -148,19 +181,59 @@ function findCurrency(
   name: "Chaos Orb" | "Divine Orb",
   defaultChaosValue?: number
 ): CurrencyPrice | null {
-  const line = currencyData.lines.find((entry) => entry.detailsId === detailsId || entry.currencyTypeName === name);
-  const details = currencyData.currencyDetails.find((entry) => entry.tradeId === detailsId || entry.name === name);
-  const chaosValue = defaultChaosValue ?? line?.chaosEquivalent ?? line?.receive?.value;
+  const item = findCurrencyItem(currencyData, detailsId, name);
+  const line = findCurrencyLine(currencyData, detailsId, name, item);
+  const details = currencyData.currencyDetails?.find((entry) => entry.tradeId === detailsId || entry.name === name);
+  const chaosValue = defaultChaosValue ?? getLineChaosValue(line);
 
-  if (chaosValue === undefined || !Number.isFinite(chaosValue) || chaosValue <= 0) {
+  if (chaosValue === null || !Number.isFinite(chaosValue) || chaosValue <= 0) {
     return null;
   }
 
   return {
-    id: detailsId,
-    name,
-    detailsId: line?.detailsId ?? details?.tradeId ?? detailsId,
+    id: item?.id ?? detailsId,
+    name: item?.name ?? details?.name ?? name,
+    detailsId: item?.detailsId ?? line?.detailsId ?? details?.tradeId ?? detailsId,
     chaosValue,
-    icon: details?.icon ?? DEFAULT_CURRENCY_ICONS[detailsId === "chaos-orb" ? "chaos" : "divine"].icon
+    icon:
+      getPoeNinjaImageUrl(item?.image) ??
+      details?.icon ??
+      DEFAULT_CURRENCY_ICONS[detailsId === "chaos-orb" ? "chaos" : "divine"].icon
   };
+}
+
+function findCurrencyItem(
+  currencyData: CurrencyOverview,
+  detailsId: "chaos-orb" | "divine-orb" | "stacked-deck",
+  name: "Chaos Orb" | "Divine Orb" | "Stacked Deck"
+): CurrencyItem | undefined {
+  return currencyData.items?.find((entry) => entry.detailsId === detailsId || entry.name === name || entry.id === detailsId);
+}
+
+function findCurrencyLine(
+  currencyData: CurrencyOverview,
+  detailsId: "chaos-orb" | "divine-orb" | "stacked-deck",
+  name: "Chaos Orb" | "Divine Orb" | "Stacked Deck",
+  item?: CurrencyItem
+): CurrencyLine | undefined {
+  return currencyData.lines.find(
+    (entry) =>
+      (item !== undefined && entry.id === item.id) ||
+      entry.id === detailsId ||
+      entry.detailsId === detailsId ||
+      entry.currencyTypeName === name
+  );
+}
+
+function getLineChaosValue(line: CurrencyLine | undefined): number | null {
+  const value = line?.primaryValue ?? line?.chaosEquivalent ?? line?.receive?.value;
+  return value !== undefined && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function getPoeNinjaImageUrl(image: string | undefined): string | undefined {
+  if (!image) {
+    return undefined;
+  }
+
+  return new URL(image, POE_NINJA_BASE).toString();
 }

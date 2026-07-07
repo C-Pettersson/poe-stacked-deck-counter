@@ -33,6 +33,88 @@ describe("buildSessions", () => {
     expect(sessions[0].cards[0].priceChaos).toBe(1);
     expect(sessions[0].profitChaos).toBe(0);
   });
+
+  it("excludes cards below the minimum card value from profit", () => {
+    const sessions = buildSessions(
+      [makeDraw("2025-11-01T12:07:45Z", "The Lover")],
+      {
+        mirage: makeSnapshot("mirage", "Mirage", 4, 1)
+      },
+      {},
+      {
+        pricingLeagueId: "mirage",
+        profitFilters: {
+          minimumCardValueChaos: 5,
+          minimumStackValueChaos: 0,
+          requireConfidence: false
+        }
+      }
+    );
+
+    expect(sessions[0].cards[0]).toMatchObject({
+      priceChaos: 4,
+      totalChaos: 4,
+      includedValueChaos: 0,
+      exclusionReason: "card-value"
+    });
+    expect(sessions[0].totalValueChaos).toBe(0);
+    expect(sessions[0].profitChaos).toBe(-1);
+  });
+
+  it("excludes card stacks below the minimum stack value from profit", () => {
+    const sessions = buildSessions(
+      [makeDraw("2025-11-01T12:07:45Z", "The Lover"), makeDraw("2025-11-01T12:07:46Z", "The Lover")],
+      {
+        mirage: makeSnapshot("mirage", "Mirage", 3, 1)
+      },
+      {},
+      {
+        pricingLeagueId: "mirage",
+        profitFilters: {
+          minimumCardValueChaos: 0,
+          minimumStackValueChaos: 7,
+          requireConfidence: false
+        }
+      }
+    );
+
+    expect(sessions[0].cards[0]).toMatchObject({
+      priceChaos: 3,
+      totalChaos: 6,
+      includedValueChaos: 0,
+      exclusionReason: "stack-value"
+    });
+    expect(sessions[0].totalValueChaos).toBe(0);
+    expect(sessions[0].profitChaos).toBe(-2);
+  });
+
+  it("excludes cards without price confidence when required", () => {
+    const sessions = buildSessions(
+      [makeDraw("2025-11-01T12:07:45Z", "The Lover")],
+      {
+        mirage: makeSnapshot("mirage", "Mirage", 10, 2)
+      },
+      {},
+      {
+        pricingLeagueId: "mirage",
+        profitFilters: {
+          minimumCardValueChaos: 0,
+          minimumStackValueChaos: 0,
+          requireConfidence: true
+        }
+      }
+    );
+
+    expect(sessions[0].cards[0]).toMatchObject({
+      priceChaos: 10,
+      totalChaos: 10,
+      includedValueChaos: 0,
+      exclusionReason: "confidence",
+      hasPriceConfidence: false
+    });
+    expect(sessions[0].totalValueChaos).toBe(0);
+    expect(sessions[0].profitChaos).toBe(-2);
+  });
 });
 
 function makeDraw(timestamp: string, cardName: string): ClientLogDraw {
@@ -44,7 +126,13 @@ function makeDraw(timestamp: string, cardName: string): ClientLogDraw {
   };
 }
 
-function makeSnapshot(leagueId: string, leagueName: string, cardChaos: number, deckChaos: number): PriceSnapshot {
+function makeSnapshot(
+  leagueId: string,
+  leagueName: string,
+  cardChaos: number,
+  deckChaos: number,
+  volumeCardChaos?: number
+): PriceSnapshot {
   return {
     leagueId,
     leagueName,
@@ -67,7 +155,8 @@ function makeSnapshot(leagueId: string, leagueName: string, cardChaos: number, d
         id: "the-lover",
         name: "The Lover",
         detailsId: "the-lover",
-        chaosValue: cardChaos
+        chaosValue: cardChaos,
+        volumeChaosValue: volumeCardChaos
       }
     }
   };

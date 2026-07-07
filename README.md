@@ -9,6 +9,7 @@ Electron and TypeScript app for scanning Path of Exile `Client.txt`, grouping st
 - Groups openings into sessions when more than 2 hours pass between draws.
 - Maps sessions to Path of Exile challenge leagues from the PoE Wiki league date table, with manual override in the UI.
 - Fetches and caches divination card prices and Stacked Deck price from poe.ninja.
+- Filters low-value or untrusted card prices out of value and profit calculations.
 - Provides Sessions, Data, and Settings tabs with Discord, Reddit, CSV, and poe.how draft sharing.
 - Uses release-it with Conventional Commits and GitHub release publishing.
 

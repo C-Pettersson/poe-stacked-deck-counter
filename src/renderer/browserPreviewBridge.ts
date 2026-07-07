@@ -1,5 +1,6 @@
 import { DEFAULT_CURRENCY_ICONS } from "../shared/currencyIcons.js";
 import { CHALLENGE_LEAGUES, getLeagueById } from "../shared/leagues.js";
+import { DEFAULT_PROFIT_FILTERS, normalizeProfitFilters } from "../shared/profitFilters.js";
 import { buildSessions } from "../shared/sessions.js";
 import type { ClientLogDraw, LeagueInfo, PriceSnapshot, ScanProgress, ScanResult, Settings } from "../shared/types.js";
 
@@ -7,6 +8,7 @@ const previewSettings: Settings = {
   logPath: "Browser preview sample data",
   selectedLeagueId: "mirage",
   currencyMode: "auto",
+  profitFilters: DEFAULT_PROFIT_FILTERS,
   sessionLeagueOverrides: {}
 };
 
@@ -133,6 +135,7 @@ function mergeSettings(serverSettings: Settings, savedSettings: Partial<Settings
         ? savedSettings.logPath
         : serverSettings.logPath,
     currencyMode: savedSettings.currencyMode === "chaos" ? "chaos" : serverSettings.currencyMode ?? previewSettings.currencyMode,
+    profitFilters: normalizeProfitFilters(savedSettings.profitFilters ?? serverSettings.profitFilters),
     sessionLeagueOverrides: savedSettings.sessionLeagueOverrides ?? serverSettings.sessionLeagueOverrides
   };
 }
@@ -152,7 +155,9 @@ function createFallbackScanResult(filePath: string, currentSettings: Settings): 
     fileSize: 2400,
     scannedAt: new Date().toISOString(),
     draws: previewDraws,
-    sessions: buildSessions(previewDraws, null, currentSettings.sessionLeagueOverrides)
+    sessions: buildSessions(previewDraws, null, currentSettings.sessionLeagueOverrides, {
+      profitFilters: currentSettings.profitFilters
+    })
   };
 }
 
@@ -232,6 +237,8 @@ function createPreviewSnapshot(leagueId: string): PriceSnapshot {
         name: "Emperor's Luck",
         detailsId: "emperors-luck",
         chaosValue: 0.3,
+        volumeChaosValue: 0.25,
+        hasConfidence: false,
         change7d: -2.1,
         icon: PREVIEW_DIVINATION_ICON
       },
@@ -240,6 +247,8 @@ function createPreviewSnapshot(leagueId: string): PriceSnapshot {
         name: "The Watcher",
         detailsId: "the-watcher",
         chaosValue: 0.5,
+        volumeChaosValue: 0.4,
+        hasConfidence: true,
         change7d: 1.4
       },
       "the hoarder": {
@@ -247,6 +256,8 @@ function createPreviewSnapshot(leagueId: string): PriceSnapshot {
         name: "The Hoarder",
         detailsId: "the-hoarder",
         chaosValue: 8,
+        volumeChaosValue: 7.5,
+        hasConfidence: true,
         change7d: 4.7,
         icon: PREVIEW_DIVINATION_ICON
       },
@@ -255,6 +266,8 @@ function createPreviewSnapshot(leagueId: string): PriceSnapshot {
         name: "The Doctor",
         detailsId: "the-doctor",
         chaosValue: 1260,
+        volumeChaosValue: 1200,
+        hasConfidence: true,
         change7d: 8.2,
         icon: PREVIEW_DIVINATION_ICON
       },
@@ -263,6 +276,8 @@ function createPreviewSnapshot(leagueId: string): PriceSnapshot {
         name: "The Nurse",
         detailsId: "the-nurse",
         chaosValue: 120,
+        volumeChaosValue: 110,
+        hasConfidence: true,
         change7d: 3.5
       }
     }

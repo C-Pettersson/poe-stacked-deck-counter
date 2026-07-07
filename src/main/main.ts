@@ -66,7 +66,9 @@ function registerIpc(): void {
       fileSize: result.fileSize,
       scannedAt: new Date().toISOString(),
       draws: result.draws,
-      sessions: buildSessions(result.draws, null, settings.sessionLeagueOverrides)
+      sessions: buildSessions(result.draws, null, settings.sessionLeagueOverrides, {
+        profitFilters: settings.profitFilters
+      })
     };
   });
 
