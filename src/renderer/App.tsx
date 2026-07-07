@@ -42,6 +42,14 @@ const initialProgress: ScanProgress = {
   drawsFound: 0
 };
 
+const SELECTED_SESSION_FILTER_ID = "selected-session";
+const ALL_LEAGUES_FILTER_ID = "all-leagues";
+
+type DataLeagueFilterId =
+  | typeof SELECTED_SESSION_FILTER_ID
+  | typeof ALL_LEAGUES_FILTER_ID
+  | `league:${string}`;
+
 export function App(): ReactElement {
   const [activeTab, setActiveTab] = useState<AppTab>("sessions");
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -51,6 +59,7 @@ export function App(): ReactElement {
   const [priceSnapshots, setPriceSnapshots] = useState<Record<string, PriceSnapshot>>({});
   const [priceStatus, setPriceStatus] = useState("No price cache loaded");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [dataLeagueFilterId, setDataLeagueFilterId] = useState<DataLeagueFilterId>(SELECTED_SESSION_FILTER_ID);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -64,12 +73,14 @@ export function App(): ReactElement {
   }, []);
 
   const sessions = useMemo(
-    () => buildSessions(scanResult?.draws ?? [], priceSnapshots, settings?.sessionLeagueOverrides ?? {}),
+    () =>
+      buildSessions(scanResult?.draws ?? [], priceSnapshots, settings?.sessionLeagueOverrides ?? {}).sort(
+        (a, b) => Date.parse(b.startAt) - Date.parse(a.startAt)
+      ),
     [priceSnapshots, scanResult?.draws, settings?.sessionLeagueOverrides]
   );
 
   const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? sessions[0] ?? null;
-  const displayedCards = useMemo(() => rollupCards(selectedSession ? [selectedSession] : sessions), [selectedSession, sessions]);
   const summary = useMemo(() => summarizeSessions(sessions), [sessions]);
 
   useEffect(() => {
@@ -153,6 +164,15 @@ export function App(): ReactElement {
     };
     await updateSettings(nextSettings);
     await loadPrices(leagueId, false);
+  }
+
+  async function changeDataLeagueFilter(filterId: DataLeagueFilterId): Promise<void> {
+    setDataLeagueFilterId(filterId);
+
+    const leagueId = getLeagueIdFromDataFilter(filterId);
+    if (leagueId && !priceSnapshots[leagueId]) {
+      await loadPrices(leagueId, false);
+    }
   }
 
   async function copyPayload(payload: { title: string; text: string }): Promise<void> {
@@ -252,7 +272,14 @@ export function App(): ReactElement {
         />
       ) : null}
 
-      {activeTab === "data" ? <DataTab sessions={sessions} cards={displayedCards} selectedSession={selectedSession} /> : null}
+      {activeTab === "data" ? (
+        <DataTab
+          sessions={sessions}
+          selectedSession={selectedSession}
+          leagueFilterId={dataLeagueFilterId}
+          onLeagueFilterChange={(filterId) => void changeDataLeagueFilter(filterId)}
+        />
+      ) : null}
 
       {activeTab === "settings" ? (
         <SettingsTab
@@ -424,23 +451,58 @@ function SessionsTab(props: {
 
 function DataTab({
   sessions,
-  cards,
-  selectedSession
+  selectedSession,
+  leagueFilterId,
+  onLeagueFilterChange
 }: {
   sessions: DeckSession[];
-  cards: ReturnType<typeof rollupCards>;
   selectedSession: DeckSession | null;
+  leagueFilterId: DataLeagueFilterId;
+  onLeagueFilterChange: (filterId: DataLeagueFilterId) => void;
 }): ReactElement {
-  const totalCards = selectedSession?.totalCards ?? sessions.reduce((total, session) => total + session.totalCards, 0);
+  const effectiveFilterId =
+    leagueFilterId === SELECTED_SESSION_FILTER_ID && !selectedSession ? ALL_LEAGUES_FILTER_ID : leagueFilterId;
+  const leagueCounts = useMemo(() => countSessionsByLeague(sessions), [sessions]);
+  const visibleSessions = useMemo(
+    () => getDataFilterSessions(sessions, selectedSession, effectiveFilterId),
+    [effectiveFilterId, selectedSession, sessions]
+  );
+  const cards = useMemo(() => rollupCards(visibleSessions), [visibleSessions]);
+  const totalCards = visibleSessions.reduce((total, session) => total + session.totalCards, 0);
 
   return (
     <section className="data-panel">
       <div className="detail-header">
         <div>
-          <h2>{selectedSession ? "Selected Session" : "All Sessions"}</h2>
-          <p>{sessions.length.toLocaleString()} sessions loaded</p>
+          <h2>{getDataFilterTitle(effectiveFilterId)}</h2>
+          <p>
+            {visibleSessions.length.toLocaleString()} of {sessions.length.toLocaleString()} sessions loaded
+          </p>
         </div>
-        <Database size={24} />
+        <div className="data-actions">
+          <label className="select-shell compact">
+            <span>League filter</span>
+            <select
+              value={effectiveFilterId}
+              onChange={(event) => onLeagueFilterChange(event.target.value as DataLeagueFilterId)}
+            >
+              <option value={SELECTED_SESSION_FILTER_ID} disabled={!selectedSession}>
+                Selected session
+              </option>
+              <option value={ALL_LEAGUES_FILTER_ID}>All leagues</option>
+              {CHALLENGE_LEAGUES.map((league) => {
+                const sessionCount = leagueCounts.get(league.id) ?? 0;
+                return (
+                  <option value={createLeagueFilterId(league.id)} key={league.id}>
+                    {league.name}
+                    {sessionCount > 0 ? ` (${sessionCount})` : ""}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+          <Database size={24} />
+        </div>
       </div>
       <div className="table-scroll">
         <table>
@@ -455,16 +517,24 @@ function DataTab({
             </tr>
           </thead>
           <tbody>
-            {cards.map((card) => (
-              <tr key={card.name}>
-                <td>{card.name}</td>
-                <td>{card.count.toLocaleString()}</td>
-                <td>{formatDropRate(card.count, totalCards)}</td>
-                <td>{formatChaos(card.priceChaos)}</td>
-                <td>{formatChaos(card.totalChaos)}</td>
-                <td>{formatPercent(card.change7d)}</td>
+            {cards.length > 0 ? (
+              cards.map((card) => (
+                <tr key={card.name}>
+                  <td>{card.name}</td>
+                  <td>{card.count.toLocaleString()}</td>
+                  <td>{formatDropRate(card.count, totalCards)}</td>
+                  <td>{formatChaos(card.priceChaos)}</td>
+                  <td>{formatChaos(card.totalChaos)}</td>
+                  <td>{formatPercent(card.change7d)}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td className="table-empty" colSpan={6}>
+                  No cards match this filter
+                </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
@@ -543,4 +613,45 @@ function summarizeSessions(sessions: DeckSession[]): { sessions: number; cards: 
     }),
     { sessions: 0, cards: 0, value: 0, cost: 0, profit: 0 }
   );
+}
+
+function createLeagueFilterId(leagueId: string): DataLeagueFilterId {
+  return `league:${leagueId}`;
+}
+
+function getLeagueIdFromDataFilter(filterId: DataLeagueFilterId): string | null {
+  return filterId.startsWith("league:") ? filterId.slice("league:".length) : null;
+}
+
+function getDataFilterSessions(
+  sessions: DeckSession[],
+  selectedSession: DeckSession | null,
+  filterId: DataLeagueFilterId
+): DeckSession[] {
+  if (filterId === SELECTED_SESSION_FILTER_ID) {
+    return selectedSession ? [selectedSession] : sessions;
+  }
+
+  const leagueId = getLeagueIdFromDataFilter(filterId);
+  if (leagueId) {
+    return sessions.filter((session) => session.leagueId === leagueId);
+  }
+
+  return sessions;
+}
+
+function getDataFilterTitle(filterId: DataLeagueFilterId): string {
+  if (filterId === SELECTED_SESSION_FILTER_ID) {
+    return "Selected Session";
+  }
+
+  const leagueId = getLeagueIdFromDataFilter(filterId);
+  return leagueId ? `${getLeagueById(leagueId).name} League` : "All Leagues";
+}
+
+function countSessionsByLeague(sessions: DeckSession[]): Map<string, number> {
+  return sessions.reduce((counts, session) => {
+    counts.set(session.leagueId, (counts.get(session.leagueId) ?? 0) + 1);
+    return counts;
+  }, new Map<string, number>());
 }

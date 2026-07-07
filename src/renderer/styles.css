@@ -410,6 +410,14 @@ p {
   padding: 18px;
 }
 
+.data-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
 .table-scroll {
   overflow: auto;
   max-height: calc(100vh - 290px);
@@ -440,6 +448,12 @@ th {
   background: #151d22;
   color: #aebec6;
   z-index: 1;
+}
+
+td.table-empty {
+  height: 96px;
+  color: #9fb0b8;
+  text-align: center;
 }
 
 .settings-grid {
@@ -499,6 +513,10 @@ th {
   }
 
   .header-actions {
+    justify-content: flex-start;
+  }
+
+  .data-actions {
     justify-content: flex-start;
   }
 
