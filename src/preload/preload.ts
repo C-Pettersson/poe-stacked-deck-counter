@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { LeagueInfo, PriceSnapshot, ScanProgress, ScanResult, Settings } from "../shared/types.js";
+import type {
+  AppInfo,
+  AppUpdateInfo,
+  LeagueInfo,
+  PriceSnapshot,
+  ScanProgress,
+  ScanResult,
+  Settings
+} from "../shared/types.js";
 
 const api = {
   loadSettings: (): Promise<Settings> => ipcRenderer.invoke("settings:load"),
@@ -13,6 +21,8 @@ const api = {
   saveTextFile: (defaultFileName: string, content: string): Promise<string | null> =>
     ipcRenderer.invoke("file:save-text", defaultFileName, content),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke("app:open-external", url),
+  getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke("app:info"),
+  checkForUpdate: (): Promise<AppUpdateInfo> => ipcRenderer.invoke("app:check-update"),
   getLeagues: (): Promise<LeagueInfo[]> => ipcRenderer.invoke("app:leagues"),
   onScanProgress: (listener: (progress: ScanProgress) => void): (() => void) => {
     const channelListener = (_event: Electron.IpcRendererEvent, progress: ScanProgress): void => listener(progress);

@@ -3,7 +3,6 @@ import {
   ArrowDown,
   ArrowUp,
   BarChart3,
-  Check,
   ChevronsUpDown,
   Clipboard,
   Copy,
@@ -30,7 +29,16 @@ import {
   createRedditShare,
   stringifyDraft
 } from "../shared/share.js";
-import type { AppTab, DeckSession, PriceSnapshot, ScanProgress, ScanResult, Settings } from "../shared/types.js";
+import type {
+  AppInfo,
+  AppTab,
+  AppUpdateInfo,
+  DeckSession,
+  PriceSnapshot,
+  ScanProgress,
+  ScanResult,
+  Settings
+} from "../shared/types.js";
 import { CurrencyAmount } from "./CurrencyAmount.js";
 import stackedDeckLogo from "./assets/stacked-deck-logo.png";
 import {
@@ -67,18 +75,23 @@ const DATA_TABLE_COLUMNS: Array<{ key: DataSortKey; label: string }> = [
 
 export function App(): ReactElement {
   const [activeTab, setActiveTab] = useState<AppTab>("sessions");
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [scanProgress, setScanProgress] = useState<ScanProgress>(initialProgress);
   const [isScanning, setIsScanning] = useState(false);
+  const [isCheckingForUpdate, setIsCheckingForUpdate] = useState(false);
   const [priceSnapshots, setPriceSnapshots] = useState<Record<string, PriceSnapshot>>({});
   const [priceStatus, setPriceStatus] = useState("No price cache loaded");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [dataLeagueFilterId, setDataLeagueFilterId] = useState<DataLeagueFilterId>(SELECTED_SESSION_FILTER_ID);
   const [notice, setNotice] = useState<string | null>(null);
+  const [appUpdateInfo, setAppUpdateInfo] = useState<AppUpdateInfo | null>(null);
+  const [appUpdateStatus, setAppUpdateStatus] = useState("Update status has not been checked.");
 
   useEffect(() => {
     const unsubscribe = window.poeDeck.onScanProgress(setScanProgress);
+    void window.poeDeck.getAppInfo().then(setAppInfo).catch(() => undefined);
     void window.poeDeck.loadSettings().then((loaded) => {
       setSettings(loaded);
       void loadPrices(loaded.selectedLeagueId, false);
@@ -153,6 +166,25 @@ export function App(): ReactElement {
       );
     } catch (error) {
       setPriceStatus(error instanceof Error ? error.message : "Price refresh failed.");
+    }
+  }
+
+  async function checkForAppUpdate(): Promise<void> {
+    setIsCheckingForUpdate(true);
+    setAppUpdateStatus("Checking for updates...");
+
+    try {
+      const updateInfo = await window.poeDeck.checkForUpdate();
+      setAppUpdateInfo(updateInfo);
+      setAppUpdateStatus(
+        updateInfo.updateAvailable
+          ? `Version ${updateInfo.latestVersion} is available.`
+          : `Current version ${updateInfo.currentVersion} is up to date.`
+      );
+    } catch (error) {
+      setAppUpdateStatus(error instanceof Error ? error.message : "Update check failed.");
+    } finally {
+      setIsCheckingForUpdate(false);
     }
   }
 
@@ -350,8 +382,13 @@ export function App(): ReactElement {
 
       {activeTab === "settings" ? (
         <SettingsTab
+          appInfo={appInfo}
+          appUpdateInfo={appUpdateInfo}
+          appUpdateStatus={appUpdateStatus}
+          isCheckingForUpdate={isCheckingForUpdate}
           settings={settings}
           priceSnapshots={priceSnapshots}
+          onCheckForUpdate={() => void checkForAppUpdate()}
           onChooseLog={() => void chooseLogFile()}
           onOpen={(url) => void window.poeDeck.openExternal(url)}
           onProfitFiltersChange={(profitFilters) => void changeProfitFilters(profitFilters)}
@@ -745,8 +782,13 @@ function DataSortHeader({
 }
 
 function SettingsTab(props: {
+  appInfo: AppInfo | null;
+  appUpdateInfo: AppUpdateInfo | null;
+  appUpdateStatus: string;
+  isCheckingForUpdate: boolean;
   settings: Settings;
   priceSnapshots: Record<string, PriceSnapshot>;
+  onCheckForUpdate: () => void;
   onChooseLog: () => void;
   onOpen: (url: string) => void;
   onProfitFiltersChange: (profitFilters: Settings["profitFilters"]) => void;
@@ -754,6 +796,13 @@ function SettingsTab(props: {
   const selectedLeague = getLeagueById(props.settings.selectedLeagueId);
   const snapshot = props.priceSnapshots[props.settings.selectedLeagueId];
   const filters = props.settings.profitFilters;
+  const releasesUrl =
+    props.appUpdateInfo?.updateAvailable ? props.appUpdateInfo.releaseUrl : props.appInfo?.releasesUrl ?? null;
+  const versionSummary = props.appUpdateInfo
+    ? `Current version ${props.appUpdateInfo.currentVersion}; latest release ${props.appUpdateInfo.latestVersion}`
+    : props.appInfo
+      ? `Current version ${props.appInfo.version}`
+      : "Current version unavailable";
 
   function updateProfitFilters(patch: Partial<Settings["profitFilters"]>): void {
     props.onProfitFiltersChange({
@@ -826,11 +875,31 @@ function SettingsTab(props: {
         ) : null}
       </article>
       <article className="settings-card">
-        <h2>Release</h2>
-        <p>release-it, Conventional Commits, GitHub release workflow</p>
-        <div className="check-line">
-          <Check size={17} />
-          <span>Configured</span>
+        <h2>App Updates</h2>
+        <p>{versionSummary}</p>
+        <p className={props.appUpdateInfo?.updateAvailable ? "update-status available" : "update-status"}>
+          {props.appUpdateStatus}
+        </p>
+        <div className="settings-actions">
+          <button
+            aria-busy={props.isCheckingForUpdate}
+            type="button"
+            onClick={props.onCheckForUpdate}
+            disabled={props.isCheckingForUpdate}
+          >
+            {props.isCheckingForUpdate ? (
+              <LoaderCircle aria-hidden="true" className="spin-icon" size={17} />
+            ) : (
+              <RefreshCw size={17} />
+            )}
+            <span>{props.isCheckingForUpdate ? "Checking..." : "Check for Updates"}</span>
+          </button>
+          {releasesUrl ? (
+            <button type="button" onClick={() => props.onOpen(releasesUrl)}>
+              <ExternalLink size={17} />
+              <span>{props.appUpdateInfo?.updateAvailable ? "Open Release" : "Releases"}</span>
+            </button>
+          ) : null}
         </div>
       </article>
     </section>

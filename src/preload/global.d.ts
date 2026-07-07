@@ -1,4 +1,12 @@
-import type { LeagueInfo, PriceSnapshot, ScanProgress, ScanResult, Settings } from "../shared/types.js";
+import type {
+  AppInfo,
+  AppUpdateInfo,
+  LeagueInfo,
+  PriceSnapshot,
+  ScanProgress,
+  ScanResult,
+  Settings
+} from "../shared/types.js";
 
 declare global {
   interface Window {
@@ -11,6 +19,8 @@ declare global {
       copyText: (text: string) => Promise<boolean>;
       saveTextFile: (defaultFileName: string, content: string) => Promise<string | null>;
       openExternal: (url: string) => Promise<void>;
+      getAppInfo: () => Promise<AppInfo>;
+      checkForUpdate: () => Promise<AppUpdateInfo>;
       getLeagues: () => Promise<LeagueInfo[]>;
       onScanProgress: (listener: (progress: ScanProgress) => void) => () => void;
     };

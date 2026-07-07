@@ -1,8 +1,19 @@
+import packageJson from "../../package.json";
+import { APP_RELEASES_URL } from "../shared/appUpdate.js";
 import { DEFAULT_CURRENCY_ICONS } from "../shared/currencyIcons.js";
 import { CHALLENGE_LEAGUES, getLeagueById } from "../shared/leagues.js";
 import { DEFAULT_PROFIT_FILTERS, normalizeProfitFilters } from "../shared/profitFilters.js";
 import { buildSessions } from "../shared/sessions.js";
-import type { ClientLogDraw, LeagueInfo, PriceSnapshot, ScanProgress, ScanResult, Settings } from "../shared/types.js";
+import type {
+  AppInfo,
+  AppUpdateInfo,
+  ClientLogDraw,
+  LeagueInfo,
+  PriceSnapshot,
+  ScanProgress,
+  ScanResult,
+  Settings
+} from "../shared/types.js";
 
 const previewSettings: Settings = {
   logPath: "Browser preview sample data",
@@ -10,6 +21,11 @@ const previewSettings: Settings = {
   currencyMode: "auto",
   profitFilters: DEFAULT_PROFIT_FILTERS,
   sessionLeagueOverrides: {}
+};
+
+const previewAppInfo: AppInfo = {
+  version: packageJson.version,
+  releasesUrl: APP_RELEASES_URL
 };
 
 const PREVIEW_DIVINATION_ICON = "https://web.poecdn.com/image/Art/2DItems/Divination/InventoryIcon.png?scale=1&w=1&h=1";
@@ -110,6 +126,8 @@ export function installBrowserPreviewBridge(): void {
     openExternal: async (url) => {
       window.open(url, "_blank", "noopener,noreferrer");
     },
+    getAppInfo: async () => getPreviewJson<AppInfo>("/app-info").catch(() => previewAppInfo),
+    checkForUpdate: async () => getPreviewJson<AppUpdateInfo>("/app-update"),
     getLeagues: async () => getPreviewJson<LeagueInfo[]>("/leagues").catch(() => CHALLENGE_LEAGUES),
     onScanProgress: (listener) => {
       progressListeners.add(listener);

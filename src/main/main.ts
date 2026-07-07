@@ -8,9 +8,11 @@ import type { Settings } from "../shared/types.js";
 import { scanClientLog } from "./services/logScanner.js";
 import { PriceCache } from "./services/priceCache.js";
 import { DEFAULT_LOG_PATH, loadSettings, saveSettings } from "./services/settings.js";
+import { checkForUpdate, getAppInfo } from "./services/updateCheck.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
+const externalProtocols = new Set(["http:", "https:"]);
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -29,6 +31,8 @@ async function createWindow(): Promise<void> {
       sandbox: false
     }
   });
+
+  configureExternalNavigation(mainWindow);
 
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     await mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -101,9 +105,53 @@ function registerIpc(): void {
     return result.filePath;
   });
 
-  ipcMain.handle("app:open-external", (_event, url: string) => shell.openExternal(url));
+  ipcMain.handle("app:open-external", (_event, url: string) => openExternalUrl(url));
+
+  ipcMain.handle("app:info", () => getAppInfo(app.getVersion()));
+
+  ipcMain.handle("app:check-update", () => checkForUpdate(app.getVersion()));
 
   ipcMain.handle("app:leagues", () => CHALLENGE_LEAGUES);
+}
+
+function configureExternalNavigation(window: BrowserWindow): void {
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    void openExternalUrl(url).catch(() => undefined);
+    return { action: "deny" };
+  });
+
+  window.webContents.on("will-navigate", (event, url) => {
+    if (!isExternalNavigation(url)) {
+      return;
+    }
+
+    event.preventDefault();
+    void openExternalUrl(url).catch(() => undefined);
+  });
+}
+
+async function openExternalUrl(url: string): Promise<void> {
+  const parsedUrl = new URL(url);
+
+  if (!externalProtocols.has(parsedUrl.protocol)) {
+    throw new Error(`Unsupported external URL protocol: ${parsedUrl.protocol}`);
+  }
+
+  await shell.openExternal(parsedUrl.toString());
+}
+
+function isExternalNavigation(url: string): boolean {
+  const parsedUrl = new URL(url);
+
+  if (!externalProtocols.has(parsedUrl.protocol)) {
+    return false;
+  }
+
+  if (!isDev || !process.env.VITE_DEV_SERVER_URL) {
+    return true;
+  }
+
+  return parsedUrl.origin !== new URL(process.env.VITE_DEV_SERVER_URL).origin;
 }
 
 app.whenReady().then(async () => {

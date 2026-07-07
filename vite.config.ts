@@ -2,12 +2,14 @@ import react from "@vitejs/plugin-react";
 import { mkdir } from "node:fs/promises";
 import { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
+import packageJson from "./package.json";
 import { CHALLENGE_LEAGUES, getLeagueById } from "./src/shared/leagues";
 import { buildSessions } from "./src/shared/sessions";
 import type { Settings } from "./src/shared/types";
 import { scanClientLog } from "./src/main/services/logScanner";
 import { PriceCache } from "./src/main/services/priceCache";
 import { DEFAULT_LOG_PATH, defaultSettings } from "./src/main/services/settings";
+import { checkForUpdate, getAppInfo } from "./src/main/services/updateCheck";
 import { defineConfig } from "vite";
 
 export default defineConfig({
@@ -48,6 +50,16 @@ function browserPreviewApi() {
 
           if (request.method === "GET" && url.pathname === "/__poe-preview/leagues") {
             sendJson(response, CHALLENGE_LEAGUES);
+            return;
+          }
+
+          if (request.method === "GET" && url.pathname === "/__poe-preview/app-info") {
+            sendJson(response, getAppInfo(packageJson.version));
+            return;
+          }
+
+          if (request.method === "GET" && url.pathname === "/__poe-preview/app-update") {
+            sendJson(response, await checkForUpdate(packageJson.version));
             return;
           }
 

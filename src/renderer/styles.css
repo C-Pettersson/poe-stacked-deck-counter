@@ -648,11 +648,22 @@ td.table-empty {
   justify-self: start;
 }
 
-.check-line {
+.settings-actions {
   display: flex;
-  align-items: center;
   gap: 8px;
-  color: #65d9ad;
+  flex-wrap: wrap;
+}
+
+.settings-actions button {
+  justify-self: auto;
+}
+
+.update-status {
+  font-size: 13px;
+}
+
+.update-status.available {
+  color: #f0c56c;
 }
 
 .empty-state {

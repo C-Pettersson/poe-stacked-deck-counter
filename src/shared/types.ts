@@ -106,6 +106,19 @@ export interface PriceSnapshot {
   fromCache: boolean;
 }
 
+export interface AppInfo {
+  version: string;
+  releasesUrl: string;
+}
+
+export interface AppUpdateInfo {
+  currentVersion: string;
+  latestVersion: string;
+  releaseUrl: string;
+  checkedAt: string;
+  updateAvailable: boolean;
+}
+
 export interface Settings {
   logPath: string;
   selectedLeagueId: string;
