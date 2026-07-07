@@ -1,7 +1,10 @@
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   BarChart3,
   Check,
+  ChevronsUpDown,
   Clipboard,
   Copy,
   Database,
@@ -34,6 +37,13 @@ import {
   stringifyDraft
 } from "../shared/share.js";
 import type { AppTab, DeckSession, PriceSnapshot, ScanProgress, ScanResult, Settings } from "../shared/types.js";
+import {
+  DEFAULT_DATA_SORT,
+  getNextDataSort,
+  sortDataCards,
+  type DataSortKey,
+  type DataSortState
+} from "./dataSort.js";
 
 const initialProgress: ScanProgress = {
   bytesRead: 0,
@@ -49,6 +59,15 @@ type DataLeagueFilterId =
   | typeof SELECTED_SESSION_FILTER_ID
   | typeof ALL_LEAGUES_FILTER_ID
   | `league:${string}`;
+
+const DATA_TABLE_COLUMNS: Array<{ key: DataSortKey; label: string }> = [
+  { key: "card", label: "Card" },
+  { key: "count", label: "Count" },
+  { key: "dropRate", label: "Drop Rate" },
+  { key: "price", label: "Price" },
+  { key: "total", label: "Total" },
+  { key: "change7d", label: "7d" }
+];
 
 export function App(): ReactElement {
   const [activeTab, setActiveTab] = useState<AppTab>("sessions");
@@ -460,6 +479,7 @@ function DataTab({
   leagueFilterId: DataLeagueFilterId;
   onLeagueFilterChange: (filterId: DataLeagueFilterId) => void;
 }): ReactElement {
+  const [dataSort, setDataSort] = useState<DataSortState>(DEFAULT_DATA_SORT);
   const effectiveFilterId =
     leagueFilterId === SELECTED_SESSION_FILTER_ID && !selectedSession ? ALL_LEAGUES_FILTER_ID : leagueFilterId;
   const leagueCounts = useMemo(() => countSessionsByLeague(sessions), [sessions]);
@@ -467,8 +487,14 @@ function DataTab({
     () => getDataFilterSessions(sessions, selectedSession, effectiveFilterId),
     [effectiveFilterId, selectedSession, sessions]
   );
-  const cards = useMemo(() => rollupCards(visibleSessions), [visibleSessions]);
-  const totalCards = visibleSessions.reduce((total, session) => total + session.totalCards, 0);
+  const totalCards = useMemo(
+    () => visibleSessions.reduce((total, session) => total + session.totalCards, 0),
+    [visibleSessions]
+  );
+  const cards = useMemo(
+    () => sortDataCards(rollupCards(visibleSessions), totalCards, dataSort),
+    [dataSort, totalCards, visibleSessions]
+  );
 
   return (
     <section className="data-panel">
@@ -508,12 +534,15 @@ function DataTab({
         <table>
           <thead>
             <tr>
-              <th>Card</th>
-              <th>Count</th>
-              <th>Drop Rate</th>
-              <th>Price</th>
-              <th>Total</th>
-              <th>7d</th>
+              {DATA_TABLE_COLUMNS.map((column) => (
+                <DataSortHeader
+                  key={column.key}
+                  label={column.label}
+                  sort={dataSort}
+                  sortKey={column.key}
+                  onSort={(key) => setDataSort((current) => getNextDataSort(current, key))}
+                />
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -539,6 +568,39 @@ function DataTab({
         </table>
       </div>
     </section>
+  );
+}
+
+function DataSortHeader({
+  label,
+  sort,
+  sortKey,
+  onSort
+}: {
+  label: string;
+  sort: DataSortState;
+  sortKey: DataSortKey;
+  onSort: (key: DataSortKey) => void;
+}): ReactElement {
+  const isActive = sort.key === sortKey;
+  const ariaSort: "ascending" | "descending" | "none" = isActive
+    ? sort.direction === "asc"
+      ? "ascending"
+      : "descending"
+    : "none";
+  const SortIcon = isActive ? (sort.direction === "asc" ? ArrowUp : ArrowDown) : ChevronsUpDown;
+
+  return (
+    <th aria-sort={ariaSort} scope="col">
+      <button
+        className={isActive ? "table-sort-button active" : "table-sort-button"}
+        type="button"
+        onClick={() => onSort(sortKey)}
+      >
+        <span>{label}</span>
+        <SortIcon aria-hidden="true" size={14} />
+      </button>
+    </th>
   );
 }
 

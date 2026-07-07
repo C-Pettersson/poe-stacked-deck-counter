@@ -445,9 +445,44 @@ td:first-child {
 th {
   position: sticky;
   top: 0;
+  padding: 0;
   background: #151d22;
   color: #aebec6;
   z-index: 1;
+}
+
+.table-sort-button {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  justify-content: flex-end;
+}
+
+.table-sort-button:hover {
+  border: 0;
+  background: #1a2429;
+  color: #f4f7f8;
+}
+
+.table-sort-button.active {
+  color: #f4f7f8;
+}
+
+.table-sort-button svg {
+  flex: 0 0 auto;
+  color: #7f919a;
+}
+
+.table-sort-button.active svg {
+  color: #f0c56c;
+}
+
+th:first-child .table-sort-button {
+  justify-content: flex-start;
 }
 
 td.table-empty {
