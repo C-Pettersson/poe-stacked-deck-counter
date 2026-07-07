@@ -170,6 +170,32 @@ p {
   min-width: 150px;
 }
 
+.currency-select select {
+  min-width: 112px;
+}
+
+.currency-amount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  min-width: 0;
+  color: inherit;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.currency-amount img {
+  width: 1.05em;
+  height: 1.05em;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.currency-amount.placeholder {
+  gap: 0;
+}
+
 .tabs {
   display: flex;
   gap: 8px;

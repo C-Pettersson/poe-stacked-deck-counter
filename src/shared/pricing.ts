@@ -1,4 +1,5 @@
 import type { CardPrice, CurrencyPrice, LeagueInfo, PriceSnapshot } from "./types.js";
+import { DEFAULT_CURRENCY_ICONS, createDefaultCurrencyPrice } from "./currencyIcons.js";
 
 const POE_NINJA_BASE = "https://poe.ninja";
 const CARD_ICON = "https://web.poecdn.com/image/Art/2DItems/Divination/InventoryIcon.png?scale=1&w=1&h=1";
@@ -87,6 +88,10 @@ export function createPriceSnapshot(
   }
 
   const stackedDeck = findStackedDeck(currencyData);
+  const currency = {
+    chaos: findCurrency(currencyData, "chaos-orb", "Chaos Orb", 1) ?? createDefaultCurrencyPrice("chaos"),
+    divine: findCurrency(currencyData, "divine-orb", "Divine Orb")
+  };
   const expiresAt = new Date(fetchedAt.getTime() + cacheHours * 60 * 60 * 1000);
 
   return {
@@ -97,6 +102,7 @@ export function createPriceSnapshot(
     expiresAt: expiresAt.toISOString(),
     cards,
     stackedDeck,
+    currency,
     sourceUrls: {
       cards: cardPricesUrl(league.poeNinjaName),
       stackedDeck: stackedDeckUrl(league.poeNinjaName)
@@ -133,5 +139,28 @@ function findStackedDeck(currencyData: CurrencyOverview): CurrencyPrice | null {
     detailsId: line?.detailsId ?? "stacked-deck",
     chaosValue: line?.chaosEquivalent ?? line?.receive?.value ?? 0,
     icon: details?.icon
+  };
+}
+
+function findCurrency(
+  currencyData: CurrencyOverview,
+  detailsId: "chaos-orb" | "divine-orb",
+  name: "Chaos Orb" | "Divine Orb",
+  defaultChaosValue?: number
+): CurrencyPrice | null {
+  const line = currencyData.lines.find((entry) => entry.detailsId === detailsId || entry.currencyTypeName === name);
+  const details = currencyData.currencyDetails.find((entry) => entry.tradeId === detailsId || entry.name === name);
+  const chaosValue = defaultChaosValue ?? line?.chaosEquivalent ?? line?.receive?.value;
+
+  if (chaosValue === undefined || !Number.isFinite(chaosValue) || chaosValue <= 0) {
+    return null;
+  }
+
+  return {
+    id: detailsId,
+    name,
+    detailsId: line?.detailsId ?? details?.tradeId ?? detailsId,
+    chaosValue,
+    icon: details?.icon ?? DEFAULT_CURRENCY_ICONS[detailsId === "chaos-orb" ? "chaos" : "divine"].icon
   };
 }

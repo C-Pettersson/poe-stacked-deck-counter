@@ -21,14 +21,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { CHALLENGE_LEAGUES, LEAGUE_SOURCE_URL, getLeagueById } from "../shared/leagues.js";
-import {
-  formatChaos,
-  formatDateRange,
-  formatDateTime,
-  formatDropRate,
-  formatPercent,
-  formatSignedChaos
-} from "../shared/format.js";
+import { formatDateRange, formatDateTime, formatDropRate, formatPercent } from "../shared/format.js";
 import { buildSessions, rollupCards } from "../shared/sessions.js";
 import {
   createCsv,
@@ -38,6 +31,7 @@ import {
   stringifyDraft
 } from "../shared/share.js";
 import type { AppTab, DeckSession, PriceSnapshot, ScanProgress, ScanResult, Settings } from "../shared/types.js";
+import { CurrencyAmount } from "./CurrencyAmount.js";
 import {
   DEFAULT_DATA_SORT,
   getNextDataSort,
@@ -169,6 +163,14 @@ export function App(): ReactElement {
     await loadPrices(leagueId, false);
   }
 
+  async function changeCurrencyMode(currencyMode: Settings["currencyMode"]): Promise<void> {
+    if (!settings) {
+      return;
+    }
+
+    await updateSettings({ ...settings, currencyMode });
+  }
+
   async function changeSessionLeague(session: DeckSession, leagueId: string): Promise<void> {
     if (!settings) {
       return;
@@ -219,6 +221,8 @@ export function App(): ReactElement {
     return <div className="boot">Loading</div>;
   }
 
+  const selectedPriceSnapshot = priceSnapshots[settings.selectedLeagueId];
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -230,6 +234,16 @@ export function App(): ReactElement {
           </div>
         </div>
         <div className="header-actions">
+          <label className="select-shell currency-select">
+            <span>Currency</span>
+            <select
+              value={settings.currencyMode}
+              onChange={(event) => void changeCurrencyMode(event.target.value as Settings["currencyMode"])}
+            >
+              <option value="auto">Auto</option>
+              <option value="chaos">Chaos</option>
+            </select>
+          </label>
           <label className="select-shell">
             <span>Price league</span>
             <select value={settings.selectedLeagueId} onChange={(event) => void changePriceLeague(event.target.value)}>
@@ -270,9 +284,21 @@ export function App(): ReactElement {
       <section className="status-strip">
         <Metric label="Sessions" value={summary.sessions.toString()} />
         <Metric label="Cards" value={summary.cards.toString()} />
-        <Metric label="Value" value={formatChaos(summary.value)} />
-        <Metric label="Cost" value={formatChaos(summary.cost)} />
-        <Metric label="Profit" value={formatSignedChaos(summary.profit)} tone={summary.profit >= 0 ? "good" : "bad"} />
+        <Metric
+          label="Value"
+          value={<CurrencyAmount mode={settings.currencyMode} snapshot={selectedPriceSnapshot} valueChaos={summary.value} />}
+        />
+        <Metric
+          label="Cost"
+          value={<CurrencyAmount mode={settings.currencyMode} snapshot={selectedPriceSnapshot} valueChaos={summary.cost} />}
+        />
+        <Metric
+          label="Profit"
+          value={
+            <CurrencyAmount mode={settings.currencyMode} signed snapshot={selectedPriceSnapshot} valueChaos={summary.profit} />
+          }
+          tone={summary.profit >= 0 ? "good" : "bad"}
+        />
         <div className="status-note">
           <span>{priceStatus}</span>
           {notice ? <strong>{notice}</strong> : null}
@@ -283,6 +309,9 @@ export function App(): ReactElement {
 
       {activeTab === "sessions" ? (
         <SessionsTab
+          currencyMode={settings.currencyMode}
+          fallbackCurrencySnapshot={selectedPriceSnapshot}
+          priceSnapshots={priceSnapshots}
           sessions={sessions}
           selectedSession={selectedSession}
           onSelect={setSelectedSessionId}
@@ -297,6 +326,9 @@ export function App(): ReactElement {
 
       {activeTab === "data" ? (
         <DataTab
+          currencyMode={settings.currencyMode}
+          fallbackCurrencySnapshot={selectedPriceSnapshot}
+          priceSnapshots={priceSnapshots}
           sessions={sessions}
           selectedSession={selectedSession}
           leagueFilterId={dataLeagueFilterId}
@@ -325,7 +357,7 @@ function TabButton(props: { active: boolean; icon: ReactElement; label: string; 
   );
 }
 
-function Metric(props: { label: string; value: string; tone?: "good" | "bad" }): ReactElement {
+function Metric(props: { label: string; value: string | ReactElement; tone?: "good" | "bad" }): ReactElement {
   return (
     <div className={`metric ${props.tone ?? ""}`}>
       <span>{props.label}</span>
@@ -358,6 +390,9 @@ function ScanProgressBar({ progress }: { progress: ScanProgress }): ReactElement
 }
 
 function SessionsTab(props: {
+  currencyMode: Settings["currencyMode"];
+  fallbackCurrencySnapshot?: PriceSnapshot;
+  priceSnapshots: Record<string, PriceSnapshot>;
   sessions: DeckSession[];
   selectedSession: DeckSession | null;
   onSelect: (id: string) => void;
@@ -368,26 +403,40 @@ function SessionsTab(props: {
   onSavePoeHow: (session: DeckSession) => void;
   onSaveCsv: (session: DeckSession) => void;
 }): ReactElement {
+  const selectedCurrencySnapshot = props.selectedSession
+    ? getSessionCurrencySnapshot(props.selectedSession, props.priceSnapshots, props.fallbackCurrencySnapshot)
+    : props.fallbackCurrencySnapshot;
+
   return (
     <section className="session-layout">
       <aside className="session-list">
         {props.sessions.length === 0 ? (
           <EmptyState />
         ) : (
-          props.sessions.map((session) => (
-            <button
-              className={props.selectedSession?.id === session.id ? "session-list-item active" : "session-list-item"}
-              key={session.id}
-              type="button"
-              onClick={() => props.onSelect(session.id)}
-            >
-              <span>{formatDateRange(session.startAt, session.endAt)}</span>
-              <strong>{session.totalCards.toLocaleString()} cards</strong>
-              <small>
-                {session.leagueName} - {formatSignedChaos(session.profitChaos)}
-              </small>
-            </button>
-          ))
+          props.sessions.map((session) => {
+            const currencySnapshot = getSessionCurrencySnapshot(session, props.priceSnapshots, props.fallbackCurrencySnapshot);
+
+            return (
+              <button
+                className={props.selectedSession?.id === session.id ? "session-list-item active" : "session-list-item"}
+                key={session.id}
+                type="button"
+                onClick={() => props.onSelect(session.id)}
+              >
+                <span>{formatDateRange(session.startAt, session.endAt)}</span>
+                <strong>{session.totalCards.toLocaleString()} cards</strong>
+                <small>
+                  {session.leagueName} -{" "}
+                  <CurrencyAmount
+                    mode={props.currencyMode}
+                    signed
+                    snapshot={currencySnapshot}
+                    valueChaos={session.profitChaos}
+                  />
+                </small>
+              </button>
+            );
+          })
         )}
       </aside>
 
@@ -417,11 +466,36 @@ function SessionsTab(props: {
             </div>
 
             <div className="detail-metrics">
-              <Metric label="Value" value={formatChaos(props.selectedSession.totalValueChaos)} />
-              <Metric label="Deck cost" value={formatChaos(props.selectedSession.stackedDeckCostChaos)} />
+              <Metric
+                label="Value"
+                value={
+                  <CurrencyAmount
+                    mode={props.currencyMode}
+                    snapshot={selectedCurrencySnapshot}
+                    valueChaos={props.selectedSession.totalValueChaos}
+                  />
+                }
+              />
+              <Metric
+                label="Deck cost"
+                value={
+                  <CurrencyAmount
+                    mode={props.currencyMode}
+                    snapshot={selectedCurrencySnapshot}
+                    valueChaos={props.selectedSession.stackedDeckCostChaos}
+                  />
+                }
+              />
               <Metric
                 label="Profit"
-                value={formatSignedChaos(props.selectedSession.profitChaos)}
+                value={
+                  <CurrencyAmount
+                    mode={props.currencyMode}
+                    signed
+                    snapshot={selectedCurrencySnapshot}
+                    valueChaos={props.selectedSession.profitChaos}
+                  />
+                }
                 tone={props.selectedSession.profitChaos >= 0 ? "good" : "bad"}
               />
               <Metric label="Priced" value={`${props.selectedSession.pricedCards}/${props.selectedSession.uniqueCards}`} />
@@ -466,9 +540,12 @@ function SessionsTab(props: {
                     <p>{card.count} opened</p>
                     <p>Drop rate {formatDropRate(card.count, props.selectedSession!.totalCards)}</p>
                   </div>
-                  <strong>{formatChaos(card.totalChaos)}</strong>
+                  <strong>
+                    <CurrencyAmount mode={props.currencyMode} snapshot={selectedCurrencySnapshot} valueChaos={card.totalChaos} />
+                  </strong>
                   <small>
-                    {formatChaos(card.priceChaos)} each - {formatPercent(card.change7d)}
+                    <CurrencyAmount mode={props.currencyMode} snapshot={selectedCurrencySnapshot} valueChaos={card.priceChaos} /> each -{" "}
+                    {formatPercent(card.change7d)}
                   </small>
                 </article>
               ))}
@@ -502,11 +579,17 @@ function CardIcon({ icon }: { icon?: string }): ReactElement {
 }
 
 function DataTab({
+  currencyMode,
+  fallbackCurrencySnapshot,
+  priceSnapshots,
   sessions,
   selectedSession,
   leagueFilterId,
   onLeagueFilterChange
 }: {
+  currencyMode: Settings["currencyMode"];
+  fallbackCurrencySnapshot?: PriceSnapshot;
+  priceSnapshots: Record<string, PriceSnapshot>;
   sessions: DeckSession[];
   selectedSession: DeckSession | null;
   leagueFilterId: DataLeagueFilterId;
@@ -523,6 +606,10 @@ function DataTab({
   const totalCards = useMemo(
     () => visibleSessions.reduce((total, session) => total + session.totalCards, 0),
     [visibleSessions]
+  );
+  const currencySnapshot = useMemo(
+    () => getSessionsCurrencySnapshot(visibleSessions, priceSnapshots, fallbackCurrencySnapshot),
+    [fallbackCurrencySnapshot, priceSnapshots, visibleSessions]
   );
   const cards = useMemo(
     () => sortDataCards(rollupCards(visibleSessions), totalCards, dataSort),
@@ -585,8 +672,12 @@ function DataTab({
                   <td>{card.name}</td>
                   <td>{card.count.toLocaleString()}</td>
                   <td>{formatDropRate(card.count, totalCards)}</td>
-                  <td>{formatChaos(card.priceChaos)}</td>
-                  <td>{formatChaos(card.totalChaos)}</td>
+                  <td>
+                    <CurrencyAmount mode={currencyMode} snapshot={currencySnapshot} valueChaos={card.priceChaos} />
+                  </td>
+                  <td>
+                    <CurrencyAmount mode={currencyMode} snapshot={currencySnapshot} valueChaos={card.totalChaos} />
+                  </td>
                   <td>{formatPercent(card.change7d)}</td>
                 </tr>
               ))
@@ -695,6 +786,29 @@ function EmptyState(): ReactElement {
       <span>No sessions loaded</span>
     </div>
   );
+}
+
+function getSessionCurrencySnapshot(
+  session: DeckSession,
+  priceSnapshots: Record<string, PriceSnapshot>,
+  fallback: PriceSnapshot | undefined
+): PriceSnapshot | undefined {
+  return priceSnapshots[session.pricingLeagueId ?? session.leagueId] ?? fallback;
+}
+
+function getSessionsCurrencySnapshot(
+  sessions: DeckSession[],
+  priceSnapshots: Record<string, PriceSnapshot>,
+  fallback: PriceSnapshot | undefined
+): PriceSnapshot | undefined {
+  const pricingLeagueIds = new Set(sessions.map((session) => session.pricingLeagueId ?? session.leagueId));
+
+  if (pricingLeagueIds.size === 1) {
+    const pricingLeagueId = [...pricingLeagueIds][0];
+    return pricingLeagueId ? priceSnapshots[pricingLeagueId] ?? fallback : fallback;
+  }
+
+  return fallback;
 }
 
 function summarizeSessions(sessions: DeckSession[]): { sessions: number; cards: number; value: number; cost: number; profit: number } {

@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { DEFAULT_CURRENCY_MODE } from "../../shared/currencyFormat.js";
 import { getDefaultLeague } from "../../shared/leagues.js";
 import type { Settings } from "../../shared/types.js";
 
@@ -9,6 +10,7 @@ export function defaultSettings(): Settings {
   return {
     logPath: DEFAULT_LOG_PATH,
     selectedLeagueId: getDefaultLeague().id,
+    currencyMode: DEFAULT_CURRENCY_MODE,
     sessionLeagueOverrides: {}
   };
 }
@@ -22,6 +24,7 @@ export async function loadSettings(userDataPath: string): Promise<Settings> {
     return {
       ...defaultSettings(),
       ...saved,
+      currencyMode: saved.currencyMode === "chaos" ? "chaos" : DEFAULT_CURRENCY_MODE,
       sessionLeagueOverrides: saved.sessionLeagueOverrides ?? {}
     };
   } catch {

@@ -1,3 +1,4 @@
+import { DEFAULT_CURRENCY_ICONS } from "../shared/currencyIcons.js";
 import { CHALLENGE_LEAGUES, getLeagueById } from "../shared/leagues.js";
 import { buildSessions } from "../shared/sessions.js";
 import type { ClientLogDraw, LeagueInfo, PriceSnapshot, ScanProgress, ScanResult, Settings } from "../shared/types.js";
@@ -5,6 +6,7 @@ import type { ClientLogDraw, LeagueInfo, PriceSnapshot, ScanProgress, ScanResult
 const previewSettings: Settings = {
   logPath: "Browser preview sample data",
   selectedLeagueId: "mirage",
+  currencyMode: "auto",
   sessionLeagueOverrides: {}
 };
 
@@ -130,6 +132,7 @@ function mergeSettings(serverSettings: Settings, savedSettings: Partial<Settings
       savedSettings.logPath && savedSettings.logPath !== previewSettings.logPath
         ? savedSettings.logPath
         : serverSettings.logPath,
+    currencyMode: savedSettings.currencyMode === "chaos" ? "chaos" : serverSettings.currencyMode ?? previewSettings.currencyMode,
     sessionLeagueOverrides: savedSettings.sessionLeagueOverrides ?? serverSettings.sessionLeagueOverrides
   };
 }
@@ -206,6 +209,22 @@ function createPreviewSnapshot(leagueId: string): PriceSnapshot {
       name: "Stacked Deck",
       detailsId: "stacked-deck",
       chaosValue: 2.4
+    },
+    currency: {
+      chaos: {
+        id: "chaos-orb",
+        name: "Chaos Orb",
+        detailsId: "chaos-orb",
+        chaosValue: 1,
+        icon: DEFAULT_CURRENCY_ICONS.chaos.icon
+      },
+      divine: {
+        id: "divine-orb",
+        name: "Divine Orb",
+        detailsId: "divine-orb",
+        chaosValue: 210,
+        icon: DEFAULT_CURRENCY_ICONS.divine.icon
+      }
     },
     cards: {
       "emperor's luck": {

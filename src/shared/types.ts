@@ -1,4 +1,6 @@
 export type AppTab = "sessions" | "data" | "settings";
+export type CurrencyDenomination = "chaos" | "divine";
+export type CurrencyMode = "auto" | "chaos";
 
 export interface LeagueInfo {
   id: string;
@@ -39,6 +41,7 @@ export interface DeckSession {
   leagueId: string;
   leagueName: string;
   poeNinjaLeague: string;
+  pricingLeagueId?: string;
   source: "auto" | "manual";
   draws: ClientLogDraw[];
   cards: SessionCard[];
@@ -87,6 +90,10 @@ export interface PriceSnapshot {
   expiresAt: string;
   cards: Record<string, CardPrice>;
   stackedDeck: CurrencyPrice | null;
+  currency?: {
+    chaos: CurrencyPrice;
+    divine: CurrencyPrice | null;
+  };
   sourceUrls: {
     cards: string;
     stackedDeck: string;
@@ -97,6 +104,7 @@ export interface PriceSnapshot {
 export interface Settings {
   logPath: string;
   selectedLeagueId: string;
+  currencyMode: CurrencyMode;
   sessionLeagueOverrides: Record<string, string>;
 }
 

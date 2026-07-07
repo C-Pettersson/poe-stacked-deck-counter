@@ -39,7 +39,8 @@ export function buildSessions(
     const overrideLeague = overrides[temporaryId] ? getLeagueById(overrides[temporaryId]) : null;
     const league = overrideLeague ?? autoLeague;
     const source = overrideLeague ? "manual" : "auto";
-    const priced = selectSnapshot(priceSnapshot, options.pricingLeagueId ?? league.id);
+    const pricingLeagueId = options.pricingLeagueId ?? league.id;
+    const priced = selectSnapshot(priceSnapshot, pricingLeagueId);
     const cards = buildSessionCards(group, priced);
     const totalValueChaos = cards.reduce((total, card) => total + (card.totalChaos ?? 0), 0);
     const stackedDeckCostChaos = (priced?.stackedDeck?.chaosValue ?? 0) * group.length;
@@ -52,6 +53,7 @@ export function buildSessions(
       leagueId: league.id,
       leagueName: league.name,
       poeNinjaLeague: league.poeNinjaName,
+      pricingLeagueId,
       source,
       draws: group,
       cards,
