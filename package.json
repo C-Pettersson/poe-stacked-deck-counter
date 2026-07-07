@@ -1,6 +1,6 @@
 {
   "name": "poe-stacked-deck-counter",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Electron app for counting Path of Exile stacked deck openings from Client.txt.",
   "author": "C-Pettersson",
   "license": "MIT",
