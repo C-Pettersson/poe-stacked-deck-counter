@@ -16,6 +16,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   root: ".",
+  base: "./",
   plugins: [react(), browserPreviewApi()],
   build: {
     outDir: "dist/renderer",
