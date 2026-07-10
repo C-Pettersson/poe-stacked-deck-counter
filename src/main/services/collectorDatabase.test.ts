@@ -51,6 +51,46 @@ describe("CollectorDatabase", () => {
     });
     database.close();
   });
+
+  it("persists completed and active Client.txt encounters in scan checkpoints", async () => {
+    const directory = await temporaryDirectory();
+    const database = new CollectorDatabase(directory);
+    const activeEncounter = {
+      id: "encounter:the-maven:10:start",
+      encounterId: "the-maven",
+      title: "The Maven",
+      boss: "The Maven",
+      areaName: "Absence of Mercy and Empathy",
+      startedAt: "2026-07-11T18:00:00.000Z",
+      startLine: 10
+    };
+    database.writeScanSnapshot({
+      version: 1,
+      filePath: "Client.txt",
+      normalizedPath: "client.txt",
+      fileSize: 0,
+      linesRead: 20,
+      scannedAt: "2026-07-11T18:10:00.000Z",
+      draws: [],
+      pendingDraw: null,
+      encounters: [{
+        ...activeEncounter,
+        id: "encounter:the-maven:1:older",
+        startLine: 1,
+        startedAt: "2026-07-11T17:00:00.000Z",
+        endedAt: "2026-07-11T17:05:00.000Z",
+        endLine: 5,
+        leftToAreaName: "Karui Shores"
+      }],
+      encounterState: { pendingArea: null, activeEncounter },
+      anchor: null
+    });
+
+    const restored = database.readScanSnapshot("client.txt");
+    expect(restored?.encounters[0]).toMatchObject({ encounterId: "the-maven", endLine: 5 });
+    expect(restored?.encounterState.activeEncounter).toMatchObject({ encounterId: "the-maven", startLine: 10 });
+    database.close();
+  });
 });
 
 async function temporaryDirectory(): Promise<string> {

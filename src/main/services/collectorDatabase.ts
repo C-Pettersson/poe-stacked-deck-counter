@@ -5,7 +5,8 @@ import path from "node:path";
 import { DatabaseSync, type StatementSync } from "node:sqlite";
 import type { CatalogSnapshot, CollectionRun, Observation, RunItem } from "../../domain/collection.js";
 import type { MarketPriceDataset } from "../../domain/marketPricing.js";
-import type { ClientLogDraw } from "../../shared/types.js";
+import type { ClientLogDraw, ClientLogEncounter } from "../../shared/types.js";
+import type { EncounterDetectorState } from "../../features/events/clientLogEncounterDetector.js";
 import {
   normalizeLogPath,
   type CachedPendingDraw,
@@ -14,7 +15,7 @@ import {
   type LogScanSnapshot
 } from "./logScanCache.js";
 
-const DATABASE_SCHEMA_VERSION = 2;
+const DATABASE_SCHEMA_VERSION = 3;
 const SCAN_CACHE_VERSION = 1;
 
 export class CollectorDatabase {
@@ -216,6 +217,14 @@ export class CollectorDatabase {
       )
       .all(normalizedPath) as unknown as Array<{ id: string; line_number: number; occurred_at: string; payload: string }>;
     const draws = drawRows.map(mapDrawRow);
+    const encounterRows = this.database
+      .prepare(
+        `SELECT id, line_number, occurred_at, payload
+         FROM observations
+         WHERE source_id = ? AND detector_id = 'encounter-zone' AND kind = 'encounter-completed'
+         ORDER BY line_number, occurred_at, id`
+      )
+      .all(normalizedPath) as unknown as Array<{ id: string; line_number: number; occurred_at: string; payload: string }>;
 
     return {
       version: SCAN_CACHE_VERSION,
@@ -226,6 +235,11 @@ export class CollectorDatabase {
       scannedAt: row.scanned_at,
       draws,
       pendingDraw: parseNullableJson<CachedPendingDraw>(row.pending_draw),
+      encounters: encounterRows.map(mapEncounterRow),
+      encounterState: parseNullableJson<EncounterDetectorState>(row.pending_encounter) ?? {
+        pendingArea: null,
+        activeEncounter: null
+      },
       anchor: parseNullableJson<LogScanAnchor>(row.anchor)
     };
   }
@@ -237,14 +251,15 @@ export class CollectorDatabase {
       this.database
         .prepare(
           `INSERT INTO scan_checkpoints (
-             normalized_path, file_path, file_size, lines_read, scanned_at, pending_draw, anchor
-           ) VALUES (?, ?, ?, ?, ?, ?, ?)
+             normalized_path, file_path, file_size, lines_read, scanned_at, pending_draw, pending_encounter, anchor
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(normalized_path) DO UPDATE SET
              file_path = excluded.file_path,
              file_size = excluded.file_size,
              lines_read = excluded.lines_read,
              scanned_at = excluded.scanned_at,
              pending_draw = excluded.pending_draw,
+             pending_encounter = excluded.pending_encounter,
              anchor = excluded.anchor`
         )
         .run(
@@ -254,6 +269,7 @@ export class CollectorDatabase {
           snapshot.linesRead,
           snapshot.scannedAt,
           snapshot.pendingDraw ? JSON.stringify(snapshot.pendingDraw) : null,
+          JSON.stringify(snapshot.encounterState),
           snapshot.anchor ? JSON.stringify(snapshot.anchor) : null
         );
 
@@ -268,6 +284,25 @@ export class CollectorDatabase {
 
       for (const draw of snapshot.draws) {
         insert.run(draw.id, snapshot.normalizedPath, draw.timestamp, draw.lineNumber, JSON.stringify({ cardName: draw.cardName }));
+      }
+
+      this.database
+        .prepare("DELETE FROM observations WHERE source_id = ? AND detector_id = 'encounter-zone'")
+        .run(snapshot.normalizedPath);
+      const insertEncounter = this.database.prepare(
+        `INSERT INTO observations (
+           id, source_id, detector_id, kind, occurred_at, line_number, byte_offset, confidence, payload
+         ) VALUES (?, ?, 'encounter-zone', 'encounter-completed', ?, ?, NULL, ?, ?)`
+      );
+      for (const encounter of snapshot.encounters) {
+        insertEncounter.run(
+          encounter.id,
+          snapshot.normalizedPath,
+          encounter.startedAt,
+          encounter.startLine,
+          encounter.completionAt ? "high" : "medium",
+          JSON.stringify(encounter)
+        );
       }
 
       this.database.exec("COMMIT");
@@ -399,6 +434,7 @@ export class CollectorDatabase {
         lines_read INTEGER NOT NULL,
         scanned_at TEXT NOT NULL,
         pending_draw TEXT,
+        pending_encounter TEXT,
         anchor TEXT
       );
 
@@ -426,6 +462,13 @@ export class CollectorDatabase {
     }>;
     if (!priceColumns.some((column) => column.name === "source_url")) {
       this.database.exec("ALTER TABLE price_datasets ADD COLUMN source_url TEXT NOT NULL DEFAULT ''");
+    }
+
+    const checkpointColumns = this.database.prepare("PRAGMA table_info(scan_checkpoints)").all() as unknown as Array<{
+      name: string;
+    }>;
+    if (!checkpointColumns.some((column) => column.name === "pending_encounter")) {
+      this.database.exec("ALTER TABLE scan_checkpoints ADD COLUMN pending_encounter TEXT");
     }
 
     this.setMeta("schema_version", String(DATABASE_SCHEMA_VERSION));
@@ -570,6 +613,16 @@ function mapDrawRow(row: { id: string; line_number: number; occurred_at: string;
   };
 }
 
+function mapEncounterRow(row: { id: string; line_number: number; occurred_at: string; payload: string }): ClientLogEncounter {
+  const payload = JSON.parse(row.payload) as ClientLogEncounter;
+  return {
+    ...payload,
+    id: row.id,
+    startLine: Number(row.line_number),
+    startedAt: row.occurred_at
+  };
+}
+
 function parseNullableJson<T>(value: string | null): T | null {
   if (!value) {
     return null;
@@ -645,6 +698,7 @@ interface ScanCheckpointRow {
   lines_read: number;
   scanned_at: string;
   pending_draw: string | null;
+  pending_encounter: string | null;
   anchor: string | null;
 }
 

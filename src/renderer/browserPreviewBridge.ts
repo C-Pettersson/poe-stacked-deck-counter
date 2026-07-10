@@ -13,6 +13,7 @@ import {
 import { normalizeCardKey, sourceUrlsFor } from "../shared/pricing.js";
 import { DEFAULT_PROFIT_FILTERS, normalizeProfitFilters } from "../shared/profitFilters.js";
 import { projectStackedDeckSessions } from "../features/stackedDeck/sessionProjector.js";
+import { defaultEncounterNotificationSettings } from "../features/events/encounterCatalog.js";
 import type {
   AppInfo,
   AppUpdateInfo,
@@ -36,7 +37,8 @@ const previewSettings: Settings = {
   profitFilters: DEFAULT_PROFIT_FILTERS,
   ignoredCardNames: [],
   sessionLeagueOverrides: {},
-  sessionDeckPriceOverrides: {}
+  sessionDeckPriceOverrides: {},
+  encounterNotifications: defaultEncounterNotificationSettings()
 };
 
 const previewAppInfo: AppInfo = {
@@ -375,6 +377,8 @@ function createFallbackScanResult(filePath: string, currentSettings: Settings): 
     bytesScanned: 2400,
     cachedBytes: 0,
     draws: previewDraws,
+    encounters: [],
+    activeEncounter: null,
     sessions: projectStackedDeckSessions(previewDraws, null, currentSettings.sessionLeagueOverrides, {
       fixedStackedDeckPriceChaos: currentSettings.fixedStackedDeckPriceChaos,
       pricingLeagueId: currentSettings.selectedLeagueId,

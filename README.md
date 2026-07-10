@@ -4,12 +4,14 @@
 
 Wraeclast Field Notes is an open-source, local-first desktop tool for recording Path of Exile strategy runs. Start from a public [poe.how](https://poe.how/codex) template, record inputs and outcomes, inspect locally cached market values, then hand a redacted draft to poe.how for authenticated review and submission.
 
-Stacked-deck detection remains the first automatic `Client.txt` adapter. It preserves the existing two-hour grouping, filters, league overrides, fixed deck costs, price preferences, exports, and specialized data views.
+The app automatically detects stacked-deck draws and supported endgame encounters from `Client.txt`. Entering a known boss arena starts tracking; leaving it creates a drop-entry draft with an icon-first picker. See [Client.txt event detection](./docs/client-log-events.md) for supported areas, evidence, and limitations.
 
 ## What it does
 
 - Searches active public poe.how strategy templates and item metadata through existing tRPC procedures.
 - Records manual or detector-assisted collection runs with a versioned template snapshot.
+- Tracks supported PoE 1 boss arenas across incremental scans and prompts for drops after the player leaves.
+- Offers native encounter notifications configurable by lifecycle moment, encounter, and per-encounter sound.
 - Keeps runs, observations, scan checkpoints, catalog snapshots, and provider price datasets in local SQLite storage.
 - Scans large logs and performs database work in a worker so Electron's main process stays responsive.
 - Fetches prices directly from poe.watch and poe.ninja, caches them for 12 hours, and keeps stale quotes during transient outages.

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, shell } from "electron";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,6 +26,10 @@ import { PoeHowCatalogService } from "./services/poeHowCatalog.js";
 import { PriceCache } from "./services/priceCache.js";
 import { DEFAULT_LOG_PATH, loadSettings, saveSettings } from "./services/settings.js";
 import { checkForUpdate, getAppInfo } from "./services/updateCheck.js";
+import {
+  EncounterNotificationTracker,
+  type EncounterNotificationMessage
+} from "./services/encounterNotifications.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -35,6 +39,7 @@ const externalHosts = new Set([
   "github.com",
   "www.poewiki.net",
   "poewiki.net",
+  "poedb.tw",
   "poe.ninja",
   "api.poe.watch"
 ]);
@@ -94,6 +99,7 @@ async function registerIpc(): Promise<void> {
     app.getVersion()
   );
   const autoScanController = new AutoScanController<ScanResult>();
+  const encounterNotificationTracker = new EncounterNotificationTracker();
 
   ipcMain.handle("settings:load", () => loadSettings(userDataPath));
 
@@ -133,6 +139,7 @@ async function registerIpc(): Promise<void> {
 
   ipcMain.handle("log:auto-scan:configure", (event, filePath: string, settings: Settings) => {
     const safeSettings = validateSettings(settings);
+    encounterNotificationTracker.reset();
     if (!safeSettings.autoScanEnabled) {
       autoScanController.stop();
       return false;
@@ -151,6 +158,9 @@ async function registerIpc(): Promise<void> {
         return createScanResult(safeFilePath, result, safeSettings);
       },
       onResult: (result) => {
+        for (const message of encounterNotificationTracker.accept(result, safeSettings.encounterNotifications)) {
+          showEncounterNotification(message);
+        }
         if (!sender.isDestroyed()) {
           sender.send("log:auto-scan-result", result);
         }
@@ -167,6 +177,7 @@ async function registerIpc(): Promise<void> {
 
   ipcMain.handle("log:auto-scan:stop", () => {
     autoScanController.stop();
+    encounterNotificationTracker.reset();
     return true;
   });
 
@@ -228,6 +239,23 @@ async function registerIpc(): Promise<void> {
   ipcMain.handle("app:leagues", () => CHALLENGE_LEAGUES);
 }
 
+function showEncounterNotification(message: EncounterNotificationMessage): void {
+  if (!Notification.isSupported()) return;
+
+  const notification = new Notification({
+    title: message.title,
+    body: message.body,
+    silent: !message.sound
+  });
+  notification.once("click", () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+  notification.show();
+}
+
 function createScanResult(filePath: string, result: ClientLogScan, settings: Settings): ScanResult {
   return {
     filePath,
@@ -237,6 +265,8 @@ function createScanResult(filePath: string, result: ClientLogScan, settings: Set
     bytesScanned: result.bytesScanned,
     cachedBytes: result.cachedBytes,
     draws: result.draws,
+    encounters: result.encounters,
+    activeEncounter: result.activeEncounter,
     sessions: projectStackedDeckSessions(result.draws, null, settings.sessionLeagueOverrides, {
       fixedStackedDeckPriceChaos: settings.fixedStackedDeckPriceChaos,
       pricingLeagueId: settings.selectedLeagueId,
@@ -296,6 +326,10 @@ function resolveUserDataPath(): string {
     throw new Error("WRAECLAST_FIELD_NOTES_USER_DATA must be an absolute path.");
   }
   return path.normalize(override);
+}
+
+if (process.platform === "win32") {
+  app.setAppUserModelId("how.poe.fieldnotes");
 }
 
 app.whenReady().then(async () => {

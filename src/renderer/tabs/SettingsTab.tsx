@@ -1,8 +1,9 @@
-import { ExternalLink, FolderOpen, LoaderCircle, RefreshCw, Trash2 } from "lucide-react";
+import { Bell, ExternalLink, FolderOpen, LoaderCircle, RefreshCw, Trash2, Volume2 } from "lucide-react";
 import type { ReactElement } from "react";
 import { formatDateTime } from "../../shared/format.js";
 import { LEAGUE_SOURCE_URL, getLeagueById } from "../../shared/leagues.js";
 import type { AppInfo, AppUpdateInfo, PriceSnapshot, Settings } from "../../shared/types.js";
+import { ENCOUNTER_DEFINITIONS } from "../../features/events/encounterCatalog.js";
 
 export function SettingsTab(props: {
   appInfo: AppInfo | null;
@@ -17,6 +18,7 @@ export function SettingsTab(props: {
   onChooseLog: () => void;
   onOpen: (url: string) => void;
   onAutoScanChange: (enabled: boolean) => void;
+  onEncounterNotificationsChange: (settings: Settings["encounterNotifications"]) => void;
   onFixedStackedDeckPriceChange: (fixedStackedDeckPriceChaos: Settings["fixedStackedDeckPriceChaos"]) => void;
   onPriceSourceModeChange: (priceSourceMode: Settings["priceSourceMode"]) => void;
   onPriceSourcePriorityChange: (priceSourcePriority: Settings["priceSourcePriority"]) => void;
@@ -40,6 +42,35 @@ export function SettingsTab(props: {
     });
   }
 
+  function updateNotificationSettings(patch: Partial<Settings["encounterNotifications"]>): void {
+    props.onEncounterNotificationsChange({
+      ...props.settings.encounterNotifications,
+      ...patch
+    });
+  }
+
+  function updateNotificationTrigger(
+    trigger: keyof Settings["encounterNotifications"]["triggers"],
+    enabled: boolean
+  ): void {
+    updateNotificationSettings({
+      triggers: { ...props.settings.encounterNotifications.triggers, [trigger]: enabled }
+    });
+  }
+
+  function updateEncounterPolicy(
+    encounterId: string,
+    patch: Partial<Settings["encounterNotifications"]["encounters"][string]>
+  ): void {
+    const current = props.settings.encounterNotifications.encounters[encounterId] ?? { enabled: false, sound: false };
+    updateNotificationSettings({
+      encounters: {
+        ...props.settings.encounterNotifications.encounters,
+        [encounterId]: { ...current, ...patch }
+      }
+    });
+  }
+
   return (
     <section className="settings-grid">
       <article className="settings-card">
@@ -57,6 +88,93 @@ export function SettingsTab(props: {
             onChange={(event) => props.onAutoScanChange(event.target.checked)}
           />
         </label>
+      </article>
+      <article className="settings-card notification-settings-card">
+        <div className="notification-settings-heading">
+          <div>
+            <h2>Encounter Notifications</h2>
+            <p>Choose when each automatic encounter may notify and whether it can make sound. Requires Automatic scanning.</p>
+          </div>
+          <label className="notification-master-toggle">
+            <Bell size={18} aria-hidden="true" />
+            <span>Notifications enabled</span>
+            <input
+              type="checkbox"
+              checked={props.settings.encounterNotifications.enabled}
+              onChange={(event) => updateNotificationSettings({ enabled: event.target.checked })}
+            />
+          </label>
+        </div>
+
+        <fieldset className="notification-trigger-settings" disabled={!props.settings.encounterNotifications.enabled}>
+          <legend>Notify when</legend>
+          <label>
+            <input
+              type="checkbox"
+              checked={props.settings.encounterNotifications.triggers.entered}
+              onChange={(event) => updateNotificationTrigger("entered", event.target.checked)}
+            />
+            Entering the arena
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={props.settings.encounterNotifications.triggers.completion}
+              onChange={(event) => updateNotificationTrigger("completion", event.target.checked)}
+            />
+            A known completion line is heard
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={props.settings.encounterNotifications.triggers.exited}
+              onChange={(event) => updateNotificationTrigger("exited", event.target.checked)}
+            />
+            Leaving the arena
+          </label>
+        </fieldset>
+
+        <div className="notification-event-table" aria-label="Encounter notification policies">
+          <div className="notification-event-header" aria-hidden="true">
+            <span>Encounter</span>
+            <span>Notify</span>
+            <span>Sound</span>
+          </div>
+          {ENCOUNTER_DEFINITIONS.map((definition) => {
+            const policy = props.settings.encounterNotifications.encounters[definition.id] ?? {
+              enabled: false,
+              sound: false
+            };
+            return (
+              <div className="notification-event-row" key={definition.id}>
+                <div>
+                  <strong>{definition.title}</strong>
+                  <span>{definition.areaNames[0]}</span>
+                </div>
+                <label title={`Notify for ${definition.title}`}>
+                  <span className="sr-only">Notify for {definition.title}</span>
+                  <input
+                    type="checkbox"
+                    disabled={!props.settings.encounterNotifications.enabled}
+                    checked={policy.enabled}
+                    onChange={(event) => updateEncounterPolicy(definition.id, { enabled: event.target.checked })}
+                  />
+                </label>
+                <label title={`Sound for ${definition.title}`}>
+                  <Volume2 size={16} aria-hidden="true" />
+                  <span className="sr-only">Sound for {definition.title}</span>
+                  <input
+                    type="checkbox"
+                    disabled={!props.settings.encounterNotifications.enabled || !policy.enabled}
+                    checked={policy.sound}
+                    onChange={(event) => updateEncounterPolicy(definition.id, { sound: event.target.checked })}
+                  />
+                </label>
+              </div>
+            );
+          })}
+        </div>
+        <p className="notification-default-note">Shaper notifications are muted by default; every row can be changed.</p>
       </article>
       <article className="settings-card">
         <h2>League Dates</h2>

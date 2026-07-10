@@ -27,6 +27,16 @@ describe("settings", () => {
     expect(defaultSettings().sessionDeckPriceOverrides).toEqual({});
   });
 
+  it("defaults to exit notifications with Shaper muted and other encounters audible", () => {
+    const notifications = defaultSettings().encounterNotifications;
+    expect(notifications).toMatchObject({
+      enabled: true,
+      triggers: { entered: false, completion: false, exited: true }
+    });
+    expect(notifications.encounters["the-shaper"]).toEqual({ enabled: false, sound: false });
+    expect(notifications.encounters["the-maven"]).toEqual({ enabled: true, sound: true });
+  });
+
   it("defaults to hybrid prices with poe.watch priority", () => {
     expect(defaultSettings()).toMatchObject({
       priceSourceMode: "hybrid",
@@ -89,6 +99,21 @@ describe("settings", () => {
     expect(loadedSettings.priceSourceMode).toBe("poe-ninja");
     expect(loadedSettings.priceSourcePriority).toBe("poe-ninja");
     expect(loadedSettings.profitFilters.confidenceFilter).toBe("low-only");
+  });
+
+  it("round-trips customized encounter notification policies", async () => {
+    const userDataPath = await createTempDir();
+    const notifications = defaultSettings().encounterNotifications;
+    notifications.triggers.entered = true;
+    notifications.encounters["the-shaper"] = { enabled: true, sound: false };
+    await saveSettings(userDataPath, {
+      ...defaultSettings(),
+      encounterNotifications: notifications
+    });
+
+    const loaded = await loadSettings(userDataPath);
+    expect(loaded.encounterNotifications.triggers.entered).toBe(true);
+    expect(loaded.encounterNotifications.encounters["the-shaper"]).toEqual({ enabled: true, sound: false });
   });
 
   it("round-trips ignored card names through persisted settings", async () => {
@@ -174,6 +199,31 @@ describe("settings", () => {
     const loadedSettings = await loadSettings(userDataPath);
 
     expect(loadedSettings.ignoredCardNames).toEqual(["the doctor", "the watcher"]);
+  });
+
+  it("fills missing notification fields and drops unknown encounter policies", async () => {
+    const userDataPath = await createTempDir();
+    await writeFile(
+      path.join(userDataPath, "settings.json"),
+      `${JSON.stringify({
+        ...defaultSettings(),
+        encounterNotifications: {
+          enabled: true,
+          triggers: { entered: true },
+          encounters: {
+            "the-maven": { enabled: false, sound: false },
+            "not-a-real-encounter": { enabled: true, sound: true }
+          }
+        }
+      })}\n`,
+      "utf8"
+    );
+
+    const loaded = await loadSettings(userDataPath);
+    expect(loaded.encounterNotifications.triggers).toEqual({ entered: true, completion: false, exited: true });
+    expect(loaded.encounterNotifications.encounters["the-maven"]).toEqual({ enabled: false, sound: false });
+    expect(loaded.encounterNotifications.encounters["eater-of-worlds"]).toEqual({ enabled: true, sound: true });
+    expect(loaded.encounterNotifications.encounters["not-a-real-encounter"]).toBeUndefined();
   });
 });
 

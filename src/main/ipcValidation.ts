@@ -31,6 +31,8 @@ const templateSchema = z.object({
   categoryId: z.number().int().positive().nullable(),
   categoryName: z.string().max(300).optional(),
   image: z.string().max(2000).optional(),
+  wikiUrl: z.string().url().max(2000).optional(),
+  poedbUrl: z.string().url().max(2000).optional(),
   fixedResult: z.boolean(),
   allowRequirementSubmission: z.boolean(),
   requirements: z.array(templateItemSchema).max(2000),
@@ -93,6 +95,10 @@ export function validateMarketPriceRequest(value: unknown): MarketPriceRequest {
 }
 
 const finiteNonnegative = z.number().finite().nonnegative();
+const encounterNotificationPolicySchema = z.object({
+  enabled: z.boolean(),
+  sound: z.boolean()
+});
 const settingsSchema: z.ZodType<Settings> = z.object({
   logPath: z.string().trim().min(1).max(32_768),
   selectedLeagueId: z.string().trim().min(1).max(100),
@@ -108,7 +114,17 @@ const settingsSchema: z.ZodType<Settings> = z.object({
   }),
   ignoredCardNames: z.array(z.string().max(300)).max(10_000),
   sessionLeagueOverrides: z.record(z.string().max(300), z.string().max(100)),
-  sessionDeckPriceOverrides: z.record(z.string().max(300), finiteNonnegative)
+  sessionDeckPriceOverrides: z.record(z.string().max(300), finiteNonnegative),
+  encounterNotifications: z.object({
+    enabled: z.boolean(),
+    triggers: z.object({
+      entered: z.boolean(),
+      completion: z.boolean(),
+      exited: z.boolean()
+    }),
+    encounters: z.record(z.string().max(100), encounterNotificationPolicySchema)
+      .refine((value) => Object.keys(value).length <= 100, "Too many encounter notification policies")
+  })
 });
 
 export function validateSettings(value: unknown): Settings {

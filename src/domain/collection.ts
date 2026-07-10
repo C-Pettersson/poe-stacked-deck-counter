@@ -39,6 +39,8 @@ export interface TemplateSnapshot {
   categoryId: number | null;
   categoryName?: string;
   image?: string;
+  wikiUrl?: string;
+  poedbUrl?: string;
   fixedResult: boolean;
   allowRequirementSubmission: boolean;
   requirements: TemplateItem[];

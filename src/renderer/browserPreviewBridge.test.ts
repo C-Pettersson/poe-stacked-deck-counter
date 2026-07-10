@@ -2,6 +2,7 @@
 import { DEFAULT_PROFIT_FILTERS } from "../shared/profitFilters.js";
 import type { ScanResult, Settings } from "../shared/types.js";
 import { installBrowserPreviewBridge } from "./browserPreviewBridge.js";
+import { defaultEncounterNotificationSettings } from "../features/events/encounterCatalog.js";
 
 const settings: Settings = {
   logPath: "Client.txt",
@@ -14,7 +15,8 @@ const settings: Settings = {
   profitFilters: DEFAULT_PROFIT_FILTERS,
   ignoredCardNames: [],
   sessionLeagueOverrides: {},
-  sessionDeckPriceOverrides: {}
+  sessionDeckPriceOverrides: {},
+  encounterNotifications: defaultEncounterNotificationSettings()
 };
 
 const apiScanResult: ScanResult = {
@@ -44,6 +46,8 @@ const apiScanResult: ScanResult = {
       cardName: "The Hoarder"
     }
   ],
+  encounters: [],
+  activeEncounter: null,
   sessions: []
 };
 

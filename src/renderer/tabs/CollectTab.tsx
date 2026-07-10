@@ -8,7 +8,10 @@ import {
   Search,
   Square,
   Trash2,
-  Coins
+  Coins,
+  ExternalLink,
+  Minus,
+  Plus
 } from "lucide-react";
 import { useMemo, useState, type ReactElement } from "react";
 import type { RunItemRole } from "../../domain/collection.js";
@@ -109,14 +112,29 @@ function ActiveRunWorkspace({
   setItemQuery: (value: string) => void;
 }): ReactElement {
   const run = research.activeRun!;
+  const isDetectedEncounter = run.origin === "detector" && run.template?.name.startsWith("client-log-");
 
   return (
     <section className="research-layout">
       <div className="panel active-study-header">
         <div>
-          <span className="eyebrow">{run.template?.categoryName ?? "Custom field study"}</span>
-          <h2>{run.title}</h2>
+          <span className="eyebrow">{isDetectedEncounter ? "Encounter detected from Client.txt" : (run.template?.categoryName ?? "Custom field study")}</span>
+          <h2>{isDetectedEncounter ? `Log loot: ${run.title.replace(/ drops$/i, "")}` : run.title}</h2>
           <p>{run.template?.description ?? "Locally collected research notes ready for Codex handoff."}</p>
+          {isDetectedEncounter ? (
+            <div className="encounter-reference-actions">
+              {run.template?.wikiUrl ? (
+                <button type="button" onClick={() => research.openReference(run.template!.wikiUrl!)}>
+                  <ExternalLink size={15} /> PoE Wiki
+                </button>
+              ) : null}
+              {run.template?.poedbUrl ? (
+                <button type="button" onClick={() => research.openReference(run.template!.poedbUrl!)}>
+                  <ExternalLink size={15} /> PoEDB
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <span className={`run-state ${run.lifecycle}`}>{run.lifecycle}</span>
       </div>
@@ -172,14 +190,18 @@ function ActiveRunWorkspace({
         </label>
       </div>
 
-      <div className="run-items-grid">
-        <RunItemGroup
-          title="Investment and requirements"
-          role="requirement"
-          research={research}
-        />
-        <RunItemGroup title="Rewards and outcomes" role="reward" research={research} />
-      </div>
+      {isDetectedEncounter ? (
+        <EncounterDropPicker research={research} />
+      ) : (
+        <div className="run-items-grid">
+          <RunItemGroup
+            title="Investment and requirements"
+            role="requirement"
+            research={research}
+          />
+          <RunItemGroup title="Rewards and outcomes" role="reward" research={research} />
+        </div>
+      )}
 
       <RunValuation research={research} />
 
@@ -210,6 +232,7 @@ function ActiveRunWorkspace({
           <div className="item-search-results">
             {research.itemSearchResults.map((item) => (
               <div className="item-search-result" key={item.detailsId}>
+                <ItemArtwork name={item.name} icon={item.icon} />
                 <span>{item.name}</span>
                 <div>
                   <button type="button" onClick={() => research.addItem("requirement", item)}>+ Input</button>
@@ -239,6 +262,62 @@ function ActiveRunWorkspace({
         </button>
       </div>
     </section>
+  );
+}
+
+function EncounterDropPicker({ research }: { research: ResearchRuns }): ReactElement {
+  const rewards = research.activeRun?.items.filter((item) => item.role === "reward") ?? [];
+  return (
+    <section className="panel encounter-drop-panel">
+      <div className="encounter-drop-heading">
+        <div>
+          <span className="eyebrow">Quick drop entry</span>
+          <h3>What dropped?</h3>
+          <p>Tap an item once per copy. Use minus to correct a count.</p>
+        </div>
+        <strong>{rewards.reduce((sum, item) => sum + item.amount, 0)} items recorded</strong>
+      </div>
+      {rewards.length > 0 ? (
+        <div className="encounter-drop-grid">
+          {rewards.map((item) => (
+            <article className={`encounter-drop-card ${item.amount > 0 ? "selected" : ""}`} key={item.id}>
+              <button
+                className="encounter-drop-add"
+                type="button"
+                aria-label={`Add ${item.name}`}
+                onClick={() => research.changeItemAmount(item.id, item.amount + 1)}
+              >
+                <ItemArtwork name={item.name} icon={item.icon} large />
+                <strong>{item.name}</strong>
+                <span className="drop-count">{item.amount}</span>
+              </button>
+              <button
+                className="encounter-drop-minus"
+                type="button"
+                aria-label={`Remove one ${item.name}`}
+                disabled={item.amount <= 0}
+                onClick={() => research.changeItemAmount(item.id, Math.max(0, item.amount - 1))}
+              >
+                <Minus size={16} />
+              </button>
+              <Plus className="encounter-drop-plus" size={18} aria-hidden="true" />
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="encounter-no-drops">No curated drop list is available for this encounter yet. Search below to add what dropped.</p>
+      )}
+    </section>
+  );
+}
+
+function ItemArtwork({ name, icon, large = false }: { name: string; icon?: string; large?: boolean }): ReactElement {
+  const initials = name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("");
+  return (
+    <span className={`item-artwork ${large ? "large" : ""}`} aria-hidden="true">
+      <span>{initials}</span>
+      {icon ? <img src={icon} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : null}
+    </span>
   );
 }
 

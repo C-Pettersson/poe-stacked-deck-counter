@@ -63,6 +63,33 @@ describe("scanClientLog cache", () => {
     expect(secondScan.draws[0]).toMatchObject({ lineNumber: 1, cardName: "Emperor's Luck" });
   });
 
+  it("keeps an active encounter across incremental scans and completes it on zone exit", async () => {
+    const fixture = await createFixture([
+      '2026/07/11 19:00:00 1 a [DEBUG Client 1] Generating level 84 area "MapWorldsShapersRealm" with seed 1234',
+      "2026/07/11 19:00:02 2 a [INFO Client 1] : You have entered The Shaper's Realm."
+    ].join("\n") + "\n");
+
+    const firstScan = await scanClientLog(fixture.logPath, { cache: fixture.cache });
+    expect(firstScan.activeEncounter?.encounterId).toBe("the-shaper");
+    expect(firstScan.encounters).toHaveLength(0);
+
+    const appended = [
+      "2026/07/11 19:05:00 3 a [INFO Client 1] : Death comes for us all, eventually. Even you...",
+      "2026/07/11 19:06:01 4 a [INFO Client 1] : You have entered Celestial Hideout."
+    ].join("\n") + "\n";
+    await appendFile(fixture.logPath, appended, "utf8");
+
+    const secondScan = await scanClientLog(fixture.logPath, { cache: fixture.cache });
+    expect(secondScan.scanMode).toBe("incremental");
+    expect(secondScan.activeEncounter).toBeNull();
+    expect(secondScan.encounters).toHaveLength(1);
+    expect(secondScan.encounters[0]).toMatchObject({
+      encounterId: "the-shaper",
+      completionLine: "Death comes for us all, eventually. Even you...",
+      leftToAreaName: "Celestial Hideout"
+    });
+  });
+
   it("does a full rescan when the log is truncated", async () => {
     const fixture = await createFixture(
       [

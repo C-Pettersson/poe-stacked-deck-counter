@@ -22,8 +22,10 @@ import {
 import type { MarketPriceQuote } from "../../domain/marketPricing.js";
 import type { PriceSourceOptions } from "../../shared/types.js";
 import type { DeckSession } from "../../shared/types.js";
+import type { ClientLogEncounter } from "../../shared/types.js";
 import { DEFAULT_PRICE_SOURCE_MODE, DEFAULT_PRICE_SOURCE_PRIORITY } from "../../shared/priceSources.js";
 import { projectStackedDeckRun } from "../../features/stackedDeck/sessionProjector.js";
+import { projectClientLogEncounter } from "../../features/events/encounterProjector.js";
 
 export function useResearchRuns(
   appVersion = "development",
@@ -242,6 +244,49 @@ export function useResearchRuns(
     }
   }
 
+  async function syncClientLogEncounters(encounters: ClientLogEncounter[]): Promise<boolean> {
+    if (encounters.length === 0) return false;
+    const knownIds = new Set(runs.map((run) => run.id));
+    if (activeRun) knownIds.add(activeRun.id);
+    const detectedRuns = encounters
+      .map((encounter) => projectClientLogEncounter(encounter, catalog?.templates ?? [], {
+        leagueId: currentLeagueId,
+        gameVersion: currentGameVersion
+      }))
+      .filter((run) => !knownIds.has(run.id));
+    if (detectedRuns.length === 0) return false;
+
+    try {
+      const savedRuns: CollectionRun[] = [];
+      for (const run of detectedRuns) {
+        savedRuns.push(await window.wraeclastFieldNotes.saveRun(run));
+      }
+      setRuns((current) => [
+        ...savedRuns,
+        ...current.filter((run) => !savedRuns.some((saved) => saved.id === run.id))
+      ]);
+
+      const prompt = [...savedRuns]
+        .sort((a, b) => Date.parse(b.endedAt ?? b.updatedAt) - Date.parse(a.endedAt ?? a.updatedAt))
+        .find((run) => Date.now() - Date.parse(run.endedAt ?? "") <= 10 * 60 * 1000);
+      if (prompt) {
+        setActiveRun(prompt);
+        setNotice(`${prompt.title.replace(/ drops$/i, "")} ended. Tap the items that dropped, then save the field notes.`);
+        return true;
+      }
+
+      setNotice(`Added ${savedRuns.length} automatically detected encounter ${savedRuns.length === 1 ? "draft" : "drafts"}.`);
+      return false;
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Detected encounters could not be saved.");
+      return false;
+    }
+  }
+
+  function openReference(url: string): void {
+    void window.wraeclastFieldNotes.openExternal(url);
+  }
+
   return {
     activeRun,
     addItem,
@@ -262,6 +307,7 @@ export function useResearchRuns(
     marketQuotes,
     notice,
     openRun,
+    openReference,
     refreshCatalog,
     refreshMarketQuotes,
     runs,
@@ -269,7 +315,8 @@ export function useResearchRuns(
     saveDraft,
     searchItems,
     setActiveRun,
-    syncStackedDeckSessions
+    syncStackedDeckSessions,
+    syncClientLogEncounters
   };
 }
 

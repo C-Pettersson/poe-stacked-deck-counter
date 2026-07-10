@@ -25,6 +25,27 @@ export interface ClientLogDraw {
   cardName: string;
 }
 
+export interface ActiveClientLogEncounter {
+  id: string;
+  encounterId: string;
+  title: string;
+  boss: string;
+  areaName: string;
+  areaId?: string;
+  areaLevel?: number;
+  seed?: string;
+  startedAt: string;
+  startLine: number;
+  completionAt?: string;
+  completionLine?: string;
+}
+
+export interface ClientLogEncounter extends ActiveClientLogEncounter {
+  endedAt: string;
+  endLine: number;
+  leftToAreaName: string;
+}
+
 export interface ScanProgress {
   bytesRead: number;
   totalBytes: number;
@@ -42,6 +63,8 @@ export interface ScanResult {
   bytesScanned?: number;
   cachedBytes?: number;
   draws: ClientLogDraw[];
+  encounters: ClientLogEncounter[];
+  activeEncounter: ActiveClientLogEncounter | null;
   sessions: DeckSession[];
 }
 
@@ -157,6 +180,22 @@ export interface Settings {
   ignoredCardNames: string[];
   sessionLeagueOverrides: Record<string, string>;
   sessionDeckPriceOverrides: Record<string, number>;
+  encounterNotifications: EncounterNotificationSettings;
+}
+
+export interface EncounterNotificationPolicy {
+  enabled: boolean;
+  sound: boolean;
+}
+
+export interface EncounterNotificationSettings {
+  enabled: boolean;
+  triggers: {
+    entered: boolean;
+    completion: boolean;
+    exited: boolean;
+  };
+  encounters: Record<string, EncounterNotificationPolicy>;
 }
 
 export interface ProfitFilters {

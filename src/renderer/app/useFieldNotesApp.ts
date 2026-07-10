@@ -15,7 +15,11 @@ export function useFieldNotesApp() {
 
   useEffect(() => {
     if (!deck.scanRevision || !research.catalog) return;
-    void research.syncStackedDeckSessions(deck.sessions);
+    void (async () => {
+      await research.syncStackedDeckSessions(deck.sessions);
+      const shouldPrompt = await research.syncClientLogEncounters(deck.encounters);
+      if (shouldPrompt) setActiveTab("collect");
+    })();
     // A scan revision is the ingestion boundary; price-only session recalculations do not create runs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deck.scanRevision, research.catalog?.fetchedAt]);

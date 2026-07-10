@@ -43,6 +43,14 @@ export function App(): ReactElement {
 
       {deck.isScanning ? <ScanProgressBar progress={deck.scanProgress} /> : null}
 
+      {deck.activeEncounter ? (
+        <div className="active-encounter-strip" role="status">
+          <span className="active-encounter-pulse" aria-hidden="true" />
+          <strong>Tracking {deck.activeEncounter.title}</strong>
+          <span>{deck.activeEncounter.areaName} · drop entry will open when you leave the encounter.</span>
+        </div>
+      ) : null}
+
       {app.activeTab === "collect" ? <CollectTab research={app.research} /> : null}
 
       {app.activeTab === "runs" ? (
@@ -100,6 +108,9 @@ export function App(): ReactElement {
           onChooseLog={() => void deck.chooseLogFile()}
           onOpen={deck.openExternal}
           onAutoScanChange={(autoScanEnabled) => void deck.changeAutoScanEnabled(autoScanEnabled)}
+          onEncounterNotificationsChange={(encounterNotifications) =>
+            void deck.changeEncounterNotifications(encounterNotifications)
+          }
           onFixedStackedDeckPriceChange={(fixedStackedDeckPriceChaos) =>
             void deck.changeFixedStackedDeckPrice(fixedStackedDeckPriceChaos)
           }

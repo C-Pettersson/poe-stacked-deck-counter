@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { mkdir, open, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { ClientLogDraw } from "../../shared/types.js";
+import type { ClientLogDraw, ClientLogEncounter } from "../../shared/types.js";
+import type { EncounterDetectorState } from "../../features/events/clientLogEncounterDetector.js";
 
 export interface CachedPendingDraw {
   timestamp: string;
@@ -23,6 +24,8 @@ export interface LogScanSnapshot {
   scannedAt: string;
   draws: ClientLogDraw[];
   pendingDraw: CachedPendingDraw | null;
+  encounters: ClientLogEncounter[];
+  encounterState: EncounterDetectorState;
   anchor: LogScanAnchor | null;
 }
 
@@ -129,7 +132,20 @@ function normalizeSnapshot(payload: unknown, filePath: string): LogScanSnapshot 
     return null;
   }
 
-  return payload;
+  return {
+    ...payload,
+    encounters: Array.isArray(payload.encounters) ? payload.encounters : [],
+    encounterState: isEncounterState(payload.encounterState)
+      ? payload.encounterState
+      : { pendingArea: null, activeEncounter: null }
+  };
+}
+
+function isEncounterState(value: unknown): value is EncounterDetectorState {
+  if (!value || typeof value !== "object") return false;
+  const state = value as Partial<EncounterDetectorState>;
+  return (state.pendingArea === null || typeof state.pendingArea === "object") &&
+    (state.activeEncounter === null || typeof state.activeEncounter === "object");
 }
 
 function isSnapshotLike(payload: unknown): payload is LogScanSnapshot {

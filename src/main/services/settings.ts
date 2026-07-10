@@ -10,7 +10,8 @@ import {
 } from "../../shared/priceSources.js";
 import { normalizeCardKey } from "../../shared/pricing.js";
 import { DEFAULT_PROFIT_FILTERS, normalizeProfitFilters } from "../../shared/profitFilters.js";
-import type { Settings } from "../../shared/types.js";
+import type { EncounterNotificationSettings, Settings } from "../../shared/types.js";
+import { defaultEncounterNotificationSettings, ENCOUNTER_DEFINITIONS } from "../../features/events/encounterCatalog.js";
 
 export const DEFAULT_LOG_PATH = "C:\\games\\steamapps\\common\\Path of Exile\\logs\\Client.txt";
 
@@ -26,7 +27,8 @@ export function defaultSettings(): Settings {
     profitFilters: DEFAULT_PROFIT_FILTERS,
     ignoredCardNames: [],
     sessionLeagueOverrides: {},
-    sessionDeckPriceOverrides: {}
+    sessionDeckPriceOverrides: {},
+    encounterNotifications: defaultEncounterNotificationSettings()
   };
 }
 
@@ -48,7 +50,8 @@ export async function loadSettings(userDataPath: string): Promise<Settings> {
       profitFilters: normalizeProfitFilters(saved.profitFilters),
       ignoredCardNames: normalizeIgnoredCardNames(saved.ignoredCardNames),
       sessionLeagueOverrides: normalizeSessionLeagueOverrides(saved.sessionLeagueOverrides),
-      sessionDeckPriceOverrides: normalizeSessionDeckPriceOverrides(saved.sessionDeckPriceOverrides)
+      sessionDeckPriceOverrides: normalizeSessionDeckPriceOverrides(saved.sessionDeckPriceOverrides),
+      encounterNotifications: normalizeEncounterNotificationSettings(saved.encounterNotifications)
     };
   } catch {
     return defaultSettings();
@@ -101,4 +104,32 @@ function normalizeIgnoredCardNames(value: unknown): string[] {
   }
 
   return [...new Set(value.filter((entry): entry is string => typeof entry === "string").map(normalizeCardKey).filter(Boolean))].sort();
+}
+
+export function normalizeEncounterNotificationSettings(value: unknown): EncounterNotificationSettings {
+  const defaults = defaultEncounterNotificationSettings();
+  if (!value || typeof value !== "object" || Array.isArray(value)) return defaults;
+
+  const saved = value as Partial<EncounterNotificationSettings>;
+  const savedTriggers: Partial<EncounterNotificationSettings["triggers"]> =
+    saved.triggers && typeof saved.triggers === "object" ? saved.triggers : {};
+  const savedEncounters: Partial<EncounterNotificationSettings["encounters"]> =
+    saved.encounters && typeof saved.encounters === "object" ? saved.encounters : {};
+
+  return {
+    enabled: typeof saved.enabled === "boolean" ? saved.enabled : defaults.enabled,
+    triggers: {
+      entered: typeof savedTriggers.entered === "boolean" ? savedTriggers.entered : defaults.triggers.entered,
+      completion: typeof savedTriggers.completion === "boolean" ? savedTriggers.completion : defaults.triggers.completion,
+      exited: typeof savedTriggers.exited === "boolean" ? savedTriggers.exited : defaults.triggers.exited
+    },
+    encounters: Object.fromEntries(ENCOUNTER_DEFINITIONS.map((definition) => {
+      const fallback = defaults.encounters[definition.id];
+      const candidate = savedEncounters[definition.id];
+      return [definition.id, {
+        enabled: typeof candidate?.enabled === "boolean" ? candidate.enabled : fallback.enabled,
+        sound: typeof candidate?.sound === "boolean" ? candidate.sound : fallback.sound
+      }];
+    }))
+  };
 }

@@ -129,6 +129,7 @@ export function useStackedDeckFeature() {
     settings?.autoScanEnabled,
     settings?.fixedStackedDeckPriceChaos,
     settings?.ignoredCardNames,
+    settings?.encounterNotifications,
     settings?.logPath,
     settings?.profitFilters,
     settings?.sessionDeckPriceOverrides,
@@ -326,6 +327,13 @@ export function useStackedDeckFeature() {
     await updateSettings({ ...settings, autoScanEnabled });
   }
 
+  async function changeEncounterNotifications(
+    encounterNotifications: Settings["encounterNotifications"]
+  ): Promise<void> {
+    if (!settings) return;
+    await updateSettings({ ...settings, encounterNotifications });
+  }
+
   async function changeFixedStackedDeckPrice(fixedStackedDeckPriceChaos: Settings["fixedStackedDeckPriceChaos"]): Promise<void> {
     if (!settings) {
       return;
@@ -478,6 +486,7 @@ export function useStackedDeckFeature() {
     appUpdateInfo,
     appUpdateStatus,
     changeAutoScanEnabled,
+    changeEncounterNotifications,
     changeCurrencyMode,
     changeDataLeagueFilter,
     changeFixedStackedDeckPrice,
@@ -512,6 +521,9 @@ export function useStackedDeckFeature() {
     selectedPriceSnapshot,
     selectedSession,
     sessions,
+    encounters: scanResult?.encounters ?? [],
+    activeEncounter: scanResult?.activeEncounter ?? null,
+    scanMode: scanResult?.scanMode ?? null,
     settings,
     summary,
     toggleIgnoredCardValue
