@@ -1,4 +1,4 @@
-import { BarChart3, Settings as SettingsIcon, Table2 } from "lucide-react";
+import { BarChart3, BookOpen, History, Settings as SettingsIcon, Table2 } from "lucide-react";
 import type { ReactElement } from "react";
 import type { AppTab } from "../../shared/types.js";
 import { TabButton } from "./TabButton.js";
@@ -7,16 +7,28 @@ export function AppTabs({ activeTab, onTabChange }: { activeTab: AppTab; onTabCh
   return (
     <nav className="tabs" aria-label="Sections">
       <TabButton
-        active={activeTab === "sessions"}
-        icon={<BarChart3 size={18} />}
-        label="Sessions"
-        onClick={() => onTabChange("sessions")}
+        active={activeTab === "collect"}
+        icon={<BookOpen size={18} />}
+        label="Collect"
+        onClick={() => onTabChange("collect")}
       />
       <TabButton
-        active={activeTab === "data"}
+        active={activeTab === "runs"}
+        icon={<History size={18} />}
+        label="Runs"
+        onClick={() => onTabChange("runs")}
+      />
+      <TabButton
+        active={activeTab === "deck-runs"}
+        icon={<BarChart3 size={18} />}
+        label="Deck Runs"
+        onClick={() => onTabChange("deck-runs")}
+      />
+      <TabButton
+        active={activeTab === "deck-data"}
         icon={<Table2 size={18} />}
-        label="Data"
-        onClick={() => onTabChange("data")}
+        label="Deck Data"
+        onClick={() => onTabChange("deck-data")}
       />
       <TabButton
         active={activeTab === "settings"}

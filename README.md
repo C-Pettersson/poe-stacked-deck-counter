@@ -1,37 +1,38 @@
-# PoE Stacked Deck Counter
+# Wraeclast Field Notes
 
-Electron and TypeScript app for scanning Path of Exile `Client.txt`, grouping stacked deck openings into sessions, pricing the cards with poe.watch and poe.ninja, and exporting share text or poe.how draft JSON.
+**Field research for the poe.how Codex.**
 
-## Features
+Wraeclast Field Notes is an open-source, local-first desktop tool for recording Path of Exile strategy runs. Start from a public [poe.how](https://poe.how/codex) template, record inputs and outcomes, inspect locally cached market values, then hand a redacted draft to poe.how for authenticated review and submission.
 
-- Streams `Client.txt` so the log size does not drive memory use.
-- Detects `Card drawn from the deck` entries in both single-line and wrapped two-line forms.
-- Groups openings into sessions when more than 2 hours pass between draws.
-- Maps sessions to Path of Exile challenge leagues from the PoE Wiki league date table, with manual override in the UI.
-- Fetches and caches divination card prices and Stacked Deck price from poe.watch, poe.ninja, or hybrid source priority.
-- Filters low-value or selected confidence levels out of value and profit calculations.
-- Provides Sessions, Data, and Settings tabs with Discord, Reddit, CSV, and poe.how draft sharing.
-- Uses release-it with Conventional Commits and GitHub release publishing.
+Stacked-deck detection remains the first automatic `Client.txt` adapter. It preserves the existing two-hour grouping, filters, league overrides, fixed deck costs, price preferences, exports, and specialized data views.
 
-## Path of Exile Terms And Third-Party Software
+## What it does
 
-This project is designed to stay on the passive, read-only side of Path of Exile third-party tooling, but it is not reviewed, endorsed, or approved by Grinding Gear Games. Users are responsible for checking the current [Path of Exile & Path of Exile 2 Terms of Use](https://www.pathofexile.com/legal/terms-of-use-and-privacy-policy) and contacting GGG support if they are unsure whether a tool is acceptable.
+- Searches active public poe.how strategy templates and item metadata through existing tRPC procedures.
+- Records manual or detector-assisted collection runs with a versioned template snapshot.
+- Keeps runs, observations, scan checkpoints, catalog snapshots, and provider price datasets in local SQLite storage.
+- Scans large logs and performs database work in a worker so Electron's main process stays responsive.
+- Fetches prices directly from poe.watch and poe.ninja, caches them for 12 hours, and keeps stale quotes during transient outages.
+- Exports Codex draft v3 without local paths, raw log lines, account data, or prices.
+- Leaves authentication, reconciliation, review, and submission on poe.how.
 
-What this app does:
+## Public integration boundary
 
-- Reads a `Client.txt` path selected by the user and parses already-written `Card drawn from the deck` log entries.
-- Fetches pricing data from poe.watch and poe.ninja and caches it locally in the app user-data folder.
-- Copies or exports share text only when the user clicks the relevant UI action.
+This repository does not import poe.how router types, Prisma models, services, or proprietary source. It owns its runtime schemas and uses only public metadata procedures:
 
-What this app does not do:
+- `strategies.templates.listActive` and `strategies.templates.byName`
+- `strategies.categories.list`
+- `items.search`, `items.byDetailsId`, and `items.byDetailsIds`
+- `league.list`, `league.current`, and `league.preferred`
+- `releaseVersions.list` and `releaseVersions.current`
 
-- Does not hook into, inject into, modify, or automate the Path of Exile client.
-- Does not read Path of Exile process memory, inspect network packets, or access protected game state.
-- Does not send keyboard input, mouse input, chat commands, or gameplay actions to Path of Exile.
-- Does not connect to GGG servers as a game client, use account credentials, scrape the Path of Exile website, or bypass API limits.
-- Does not run timers or background actions that affect gameplay.
+It intentionally does not call administrative template routes, the contribution dashboard, poe.how valuation routes, or a separate catalog REST endpoint. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the complete boundary.
 
-Features that would require client interaction, gameplay automation, memory or packet inspection, account authentication, or direct GGG API/website access should be treated as out of scope unless they are checked against the current GGG terms and clarified with GGG support where needed.
+## Privacy and Path of Exile terms
+
+All collection data stays on the machine unless the user explicitly copies or saves an export. The app does not send raw logs, local paths, credentials, telemetry, or account data anywhere.
+
+This project is designed for passive, read-only observation. It does not inject into or automate Path of Exile, read process memory, inspect packets, send inputs or chat commands, or act as a game client. It is not reviewed, endorsed, or approved by Grinding Gear Games. Users should check the current [Path of Exile terms](https://www.pathofexile.com/legal/terms-of-use-and-privacy-policy) when in doubt.
 
 ## Development
 
@@ -40,20 +41,19 @@ npm install
 npm run dev
 ```
 
-## Build And Test
+Quality and packaging checks:
 
 ```bash
 npm test
+npm run typecheck
 npm run build
 npm run dist
 ```
 
+The Electron preload API is exposed as `window.wraeclastFieldNotes`. Local application data is stored under `%APPDATA%/Wraeclast Field Notes`; the first launch probes legacy Stacked Deck Counter locations without deleting or changing them.
+
 ## Release
 
-Use Conventional Commits for changes, then run:
+The planned first generalized release is `1.0.0`. The GitHub repository will be renamed to `C-Pettersson/wraeclast-field-notes` only after migration and updater compatibility are verified. Existing clones can update their remote URL without moving the local workspace directory.
 
-```bash
-npm run release
-```
-
-The tag created by release-it triggers `.github/workflows/release.yml`, which builds the Windows artifacts and publishes them to the GitHub release.
+Releases use Conventional Commits and `release-it`; pushed tags trigger the Windows artifact workflow.

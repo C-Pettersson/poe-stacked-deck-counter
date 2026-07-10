@@ -26,10 +26,16 @@ export interface LogScanSnapshot {
   anchor: LogScanAnchor | null;
 }
 
+export interface LogScanCachePort {
+  read(filePath: string): Promise<LogScanSnapshot | null>;
+  write(snapshot: Omit<LogScanSnapshot, "version" | "normalizedPath" | "anchor">): Promise<LogScanSnapshot>;
+  matchesAnchor(filePath: string, snapshot: LogScanSnapshot): Promise<boolean>;
+}
+
 const CACHE_VERSION = 1;
 const ANCHOR_BYTES = 4096;
 
-export class LogScanCache {
+export class LogScanCache implements LogScanCachePort {
   private readonly cacheDir: string;
 
   constructor(userDataPath: string) {

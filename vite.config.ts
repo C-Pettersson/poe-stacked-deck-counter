@@ -5,7 +5,7 @@ import path from "node:path";
 import packageJson from "./package.json";
 import { CHALLENGE_LEAGUES, getLeagueById } from "./src/shared/leagues";
 import { normalizePriceSourceOptions } from "./src/shared/priceSources";
-import { buildSessions } from "./src/shared/sessions";
+import { projectStackedDeckSessions } from "./src/features/stackedDeck/sessionProjector";
 import type { Settings } from "./src/shared/types";
 import { LogScanCache } from "./src/main/services/logScanCache";
 import { loadCachedClientLog, scanClientLog, type ClientLogScan } from "./src/main/services/logScanner";
@@ -124,7 +124,7 @@ function createPreviewScanResult(filePath: string, result: ClientLogScan, settin
     bytesScanned: result.bytesScanned,
     cachedBytes: result.cachedBytes,
     draws: result.draws,
-    sessions: buildSessions(result.draws, null, settings.sessionLeagueOverrides, {
+    sessions: projectStackedDeckSessions(result.draws, null, settings.sessionLeagueOverrides, {
       fixedStackedDeckPriceChaos: settings.fixedStackedDeckPriceChaos,
       pricingLeagueId: settings.selectedLeagueId,
       profitFilters: settings.profitFilters,

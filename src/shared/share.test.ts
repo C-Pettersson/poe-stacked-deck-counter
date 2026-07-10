@@ -4,16 +4,34 @@ import type { DeckSession } from "./types.js";
 
 describe("createPoeHowDraft", () => {
   it("creates a poe.how compatible stacked deck draft shape", () => {
-    const draft = createPoeHowDraft(makeSession(), () => "row-1") as {
-      payload: { contribution: { rewards: Array<{ itemDetailsId: string; amount: number }> } };
-      metadata: { rewardCount: number };
+    const draft = createPoeHowDraft(makeSession(), "1.0.0") as {
+      kind: string;
+      schemaVersion: number;
+      source: { app: string; version: string; collectionSource: string };
+      run: {
+        leagueId: string;
+        gameVersion: string;
+        duration: number;
+        requirements: Array<{ itemDetailsId: string; amount: number }>;
+        rewards: Array<{ itemDetailsId: string; amount: number }>;
+        evidence: { observationCount: number };
+      };
     };
 
-    expect(draft.payload.contribution.rewards[0]).toMatchObject({
+    expect(draft.kind).toBe("poehow.codex-draft");
+    expect(draft.schemaVersion).toBe(3);
+    expect(draft.source).toEqual({ app: "wraeclast-field-notes", version: "1.0.0", collectionSource: "log_file" });
+    expect(draft.run).toMatchObject({
+      leagueId: "mirage",
+      gameVersion: "3.28.0",
+      duration: 1_800,
+      requirements: [{ itemDetailsId: "stacked-deck", amount: 2 }]
+    });
+    expect(draft.run.rewards[0]).toMatchObject({
       itemDetailsId: "the-lover",
       amount: 2
     });
-    expect(draft.metadata.rewardCount).toBe(1);
+    expect(draft.run.evidence.observationCount).toBe(0);
   });
 });
 

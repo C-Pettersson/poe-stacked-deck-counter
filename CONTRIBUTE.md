@@ -1,99 +1,53 @@
-# Contribute
+# Contributing to Wraeclast Field Notes
 
-Thanks for taking the time to improve PoE Stacked Deck Counter. This project is an Electron and TypeScript app for passively reading Path of Exile `Client.txt` logs, grouping stacked deck openings into sessions, and pricing the resulting cards.
+Thanks for helping improve the local field-research companion for the poe.how Codex.
 
-## Project Scope
+## Project boundaries
 
-Keep contributions on the passive, read-only side of Path of Exile tooling.
+Keep this public application independent from proprietary poe.how implementation code. Public metadata may be consumed through documented tRPC procedures, but do not import poe.how's `AppRouter`, Prisma types, services, or source files. Pricing must come directly from poe.watch or poe.ninja and remain locally cached.
 
-In scope:
+Good contributions include:
 
-- Parsing already-written `Client.txt` log entries.
-- Improving session grouping, price display, filtering, exports, and local app UX.
-- Fetching and caching public price data from supported price sources.
-- Improving tests, docs, packaging, and release automation.
+- Generic collection-run commands, queries, repositories, and UI.
+- Passive `Client.txt` detectors and deterministic observation projectors.
+- Manual collection workflows and future local adapters where terms permit.
+- Runtime validation, privacy hardening, migrations, tests, documentation, and packaging.
+- Locally cached provider pricing with provenance and unresolved-item handling.
 
-Out of scope unless the current Path of Exile terms have been checked and the behavior is clearly acceptable:
+Out of scope are gameplay automation, client injection, process-memory or packet inspection, input or chat generation, account credentials, telemetry, protected poe.how procedures, and raw-log uploads.
 
-- Hooking into, injecting into, modifying, or automating the Path of Exile client.
-- Reading process memory, inspecting packets, or accessing protected game state.
-- Sending keyboard input, mouse input, chat commands, or gameplay actions.
-- Using account credentials, scraping the Path of Exile website, bypassing API limits, or connecting to GGG services as a game client.
+## Architecture rules
 
-## Local Development
+- Keep pure models under `src/domain` and use cases under `src/application`.
+- Put Electron, SQLite, tRPC, settings, log, and market-provider adapters under `src/main`.
+- Keep `src/preload` namespaced and small. Every IPC boundary needs runtime validation and bounded input.
+- Keep renderer state feature-scoped. The stacked-deck feature must not become the core run model.
+- Preserve template snapshots and item provenance so old research stays understandable after catalog changes.
+- Never include local paths, raw evidence, or valuations in a Codex draft.
 
-Install dependencies:
+## Local development
 
 ```bash
 npm install
-```
-
-Run the app in development mode:
-
-```bash
 npm run dev
 ```
 
-The app starts a Vite dev server and launches Electron against it.
-
-## Quality Checks
-
-Run the test suite:
+Before opening a pull request:
 
 ```bash
 npm test
-```
-
-Run the production build:
-
-```bash
+npm run typecheck
 npm run build
 ```
 
-Build distributable artifacts when packaging changes need verification:
+Run `npm run dist` when touching Electron, icons, preload behavior, updates, or packaging. Use fixtures and mocked fetches instead of live network dependencies in tests.
 
-```bash
-npm run dist
-```
-
-## Code Guidelines
-
-- Follow the existing TypeScript, React, and Electron structure.
-- Put shared parsing, formatting, pricing, filtering, and export logic under `src/shared` when it does not need renderer or main-process APIs.
-- Keep renderer UI code under `src/renderer`, Electron main-process services under `src/main`, and preload bridge code under `src/preload`.
-- Prefer focused pure functions for parsing and calculations so they can be covered by Vitest tests.
-- Avoid adding live network dependencies to tests. Use fixtures, mocks, or deterministic inputs instead.
-- Keep user data local unless the user explicitly exports, copies, or shares it.
-
-## Pull Requests
-
-Before opening a pull request:
-
-- Add or update tests for behavior changes.
-- Run `npm test`.
-- Run `npm run build`.
-- Include screenshots or short screen recordings for visible UI changes.
-- Update README documentation when commands, features, limitations, or user-facing behavior change.
-
-Use Conventional Commits for commit messages, for example:
+Use Conventional Commit messages such as:
 
 ```text
-feat: add league filter
-fix: handle wrapped card draw log entries
-docs: document price cache behavior
+feat(collect): add manual reward entry
+fix(migration): preserve stale provider cache
+docs: explain public integration boundary
 ```
 
-The changelog and release tags are handled by `release-it` during the release process.
-
-## Reporting Bugs
-
-When reporting a bug, include:
-
-- App version or commit.
-- Operating system.
-- Path of Exile league, if relevant.
-- What you expected to happen.
-- What happened instead.
-- A small redacted `Client.txt` excerpt if the bug depends on log parsing.
-
-Do not include account credentials, private account details, or unredacted personal paths in public issues.
+Bug reports should include the app version, operating system, league when relevant, expected and observed behavior, and only the smallest redacted log excerpt needed to reproduce a parser issue. Never post credentials, account data, unredacted paths, or complete logs.

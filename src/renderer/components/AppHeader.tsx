@@ -2,7 +2,7 @@ import { FileSearch, LoaderCircle, RefreshCw } from "lucide-react";
 import type { ReactElement } from "react";
 import { CHALLENGE_LEAGUES } from "../../shared/leagues.js";
 import type { Settings } from "../../shared/types.js";
-import stackedDeckLogo from "../assets/stacked-deck-logo.png";
+import fieldNotesLogo from "../assets/wraeclast-field-notes.png";
 
 export function AppHeader({
   isScanning,
@@ -23,11 +23,11 @@ export function AppHeader({
     <header className="app-header">
       <div className="brand-block">
         <div className="brand-mark" aria-hidden="true">
-          <img src={stackedDeckLogo} alt="" />
+          <img src={fieldNotesLogo} alt="" />
         </div>
         <div>
-          <h1>PoE Stacked Deck Counter</h1>
-          <p>{settings.logPath}</p>
+          <h1>Wraeclast Field Notes</h1>
+          <p title={settings.logPath}>Field research for the poe.how Codex.</p>
         </div>
       </div>
       <div className="header-actions">

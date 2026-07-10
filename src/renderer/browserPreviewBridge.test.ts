@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PROFIT_FILTERS } from "../shared/profitFilters.js";
 import type { ScanResult, Settings } from "../shared/types.js";
 import { installBrowserPreviewBridge } from "./browserPreviewBridge.js";
@@ -64,9 +64,9 @@ describe("browser preview bridge", () => {
     installBrowserPreviewBridge();
 
     const emittedResults: ScanResult[] = [];
-    const unsubscribe = window.poeDeck.onAutoScanResult((result) => emittedResults.push(result));
+    const unsubscribe = window.wraeclastFieldNotes.onAutoScanResult((result) => emittedResults.push(result));
 
-    await window.poeDeck.configureAutoScan("Client.txt", settings);
+    await window.wraeclastFieldNotes.configureAutoScan("Client.txt", settings);
     await vi.advanceTimersByTimeAsync(300);
     await vi.waitFor(() => expect(emittedResults).toHaveLength(1));
 

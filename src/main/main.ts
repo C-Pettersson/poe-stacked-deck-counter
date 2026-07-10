@@ -4,20 +4,46 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHALLENGE_LEAGUES, getLeagueById } from "../shared/leagues.js";
 import { normalizePriceSourceOptions } from "../shared/priceSources.js";
-import { buildSessions } from "../shared/sessions.js";
+import { projectStackedDeckSessions } from "../features/stackedDeck/sessionProjector.js";
+import type { CollectionRun } from "../domain/collection.js";
+import type { MarketPriceRequest } from "../domain/marketPricing.js";
 import type { ScanResult, Settings } from "../shared/types.js";
 import { AutoScanController } from "./services/autoScan.js";
-import { LogScanCache } from "./services/logScanCache.js";
-import { loadCachedClientLog, scanClientLog, type ClientLogScan } from "./services/logScanner.js";
+import {
+  collectionRunSchema,
+  validateItemSearch,
+  validateLogPath,
+  validateMarketPriceRequest,
+  validateSettings,
+  validateExportFileName,
+  validateExportText
+} from "./ipcValidation.js";
+import { CollectorWorkerClient } from "./services/collectorWorkerClient.js";
+import type { ClientLogScan } from "./services/logScanner.js";
+import { migrateLegacyIdentity } from "./services/identityMigration.js";
+import { MarketPriceService } from "./services/marketPrices.js";
+import { PoeHowCatalogService } from "./services/poeHowCatalog.js";
 import { PriceCache } from "./services/priceCache.js";
 import { DEFAULT_LOG_PATH, loadSettings, saveSettings } from "./services/settings.js";
 import { checkForUpdate, getAppInfo } from "./services/updateCheck.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
-const externalProtocols = new Set(["http:", "https:"]);
+const externalProtocols = new Set(["https:"]);
+const externalHosts = new Set([
+  "poe.how",
+  "github.com",
+  "www.poewiki.net",
+  "poewiki.net",
+  "poe.ninja",
+  "api.poe.watch"
+]);
+
+app.setName("Wraeclast Field Notes");
+app.setPath("userData", resolveUserDataPath());
 
 let mainWindow: BrowserWindow | null = null;
+let collectorWorker: CollectorWorkerClient | null = null;
 
 async function createWindow(): Promise<void> {
   mainWindow = new BrowserWindow({
@@ -26,12 +52,12 @@ async function createWindow(): Promise<void> {
     minWidth: 1024,
     minHeight: 720,
     backgroundColor: "#101417",
-    title: "PoE Stacked Deck Counter",
+    title: "Wraeclast Field Notes",
     webPreferences: {
       preload: path.join(__dirname, "../preload/preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: true
     }
   });
 
@@ -44,15 +70,34 @@ async function createWindow(): Promise<void> {
   }
 }
 
-function registerIpc(): void {
+async function registerIpc(): Promise<void> {
   const userDataPath = app.getPath("userData");
-  const priceCache = new PriceCache(userDataPath);
-  const logScanCache = new LogScanCache(userDataPath);
+  const migrationAppDataPath = process.env.WRAECLAST_FIELD_NOTES_USER_DATA
+    ? path.dirname(userDataPath)
+    : app.getPath("appData");
+  await migrateLegacyIdentity(migrationAppDataPath, userDataPath);
+  const priceCache = new PriceCache(userDataPath, app.getVersion());
+  collectorWorker = new CollectorWorkerClient(userDataPath);
+  const worker = collectorWorker;
+  const catalogService = new PoeHowCatalogService(
+    {
+      readCatalog: () => worker.readCatalog(),
+      writeCatalog: (snapshot) => worker.writeCatalog(snapshot)
+    },
+    app.getVersion()
+  );
+  const marketPriceService = new MarketPriceService(
+    {
+      readPriceDataset: (cacheKey) => worker.readPriceDataset(cacheKey),
+      writePriceDataset: (dataset) => worker.writePriceDataset(dataset)
+    },
+    app.getVersion()
+  );
   const autoScanController = new AutoScanController<ScanResult>();
 
   ipcMain.handle("settings:load", () => loadSettings(userDataPath));
 
-  ipcMain.handle("settings:save", (_event, settings: Settings) => saveSettings(userDataPath, settings));
+  ipcMain.handle("settings:save", (_event, settings: Settings) => saveSettings(userDataPath, validateSettings(settings)));
 
   ipcMain.handle("dialog:choose-log", async (event) => {
     const options: Electron.OpenDialogOptions = {
@@ -70,40 +115,40 @@ function registerIpc(): void {
   });
 
   ipcMain.handle("log:scan", async (event, filePath: string, settings: Settings) => {
-    const result = await scanClientLog(filePath, {
-      cache: logScanCache,
-      onProgress: (progress) => {
+    const safeFilePath = validateLogPath(filePath);
+    const safeSettings = validateSettings(settings);
+    const result = await worker.scan(safeFilePath, (progress) => {
         event.sender.send("log:scan-progress", progress);
-      }
     });
 
-    return createScanResult(filePath, result, settings);
+    return createScanResult(safeFilePath, result, safeSettings);
   });
 
   ipcMain.handle("log:load-cache", async (_event, filePath: string, settings: Settings) => {
-    const result = await loadCachedClientLog(filePath, logScanCache);
-    return result ? createScanResult(filePath, result, settings) : null;
+    const safeFilePath = validateLogPath(filePath);
+    const safeSettings = validateSettings(settings);
+    const result = await worker.loadCachedScan(safeFilePath);
+    return result ? createScanResult(safeFilePath, result, safeSettings) : null;
   });
 
   ipcMain.handle("log:auto-scan:configure", (event, filePath: string, settings: Settings) => {
-    if (!settings.autoScanEnabled) {
+    const safeSettings = validateSettings(settings);
+    if (!safeSettings.autoScanEnabled) {
       autoScanController.stop();
       return false;
     }
 
     const sender = event.sender;
+    const safeFilePath = validateLogPath(filePath);
     autoScanController.configure({
-      filePath,
+      filePath: safeFilePath,
       scan: async () => {
-        const result = await scanClientLog(filePath, {
-          cache: logScanCache,
-          onProgress: (progress) => {
+        const result = await worker.scan(safeFilePath, (progress) => {
             if (!sender.isDestroyed()) {
               sender.send("log:scan-progress", progress);
             }
-          }
         });
-        return createScanResult(filePath, result, settings);
+        return createScanResult(safeFilePath, result, safeSettings);
       },
       onResult: (result) => {
         if (!sender.isDestroyed()) {
@@ -125,7 +170,18 @@ function registerIpc(): void {
     return true;
   });
 
-  app.on("before-quit", () => autoScanController.stop());
+  app.on("before-quit", () => {
+    autoScanController.stop();
+    void worker.close();
+  });
+
+  ipcMain.handle("catalog:get", (_event, forceRefresh = false) => catalogService.getCatalog(forceRefresh === true));
+  ipcMain.handle("catalog:search-items", (_event, query: string) => catalogService.searchItems(validateItemSearch(query)));
+  ipcMain.handle("runs:list", (_event, includeArchived = false) => worker.listRuns(includeArchived === true));
+  ipcMain.handle("runs:save", (_event, run: CollectionRun) => worker.saveRun(collectionRunSchema.parse(run)));
+  ipcMain.handle("prices:market-quotes", (_event, request: MarketPriceRequest) =>
+    marketPriceService.getQuotes(validateMarketPriceRequest(request))
+  );
 
   ipcMain.handle("prices:get", async (_event, leagueId: string, options: unknown, forceRefresh = false) => {
     return priceCache.getPrices(getLeagueById(leagueId), normalizePriceSourceOptions(options), forceRefresh);
@@ -137,14 +193,16 @@ function registerIpc(): void {
   });
 
   ipcMain.handle("clipboard:write", (_event, text: string) => {
-    clipboard.writeText(text);
+    clipboard.writeText(validateExportText(text));
     return true;
   });
 
   ipcMain.handle("file:save-text", async (_event, defaultFileName: string, content: string) => {
+    const safeDefaultFileName = validateExportFileName(defaultFileName);
+    const safeContent = validateExportText(content);
     const result = await dialog.showSaveDialog({
       title: "Save export",
-      defaultPath: defaultFileName,
+      defaultPath: safeDefaultFileName,
       filters: [
         { name: "JSON", extensions: ["json"] },
         { name: "CSV", extensions: ["csv"] },
@@ -157,7 +215,7 @@ function registerIpc(): void {
     }
 
     await mkdir(path.dirname(result.filePath), { recursive: true });
-    await writeFile(result.filePath, content, "utf8");
+    await writeFile(result.filePath, safeContent, "utf8");
     return result.filePath;
   });
 
@@ -179,7 +237,7 @@ function createScanResult(filePath: string, result: ClientLogScan, settings: Set
     bytesScanned: result.bytesScanned,
     cachedBytes: result.cachedBytes,
     draws: result.draws,
-    sessions: buildSessions(result.draws, null, settings.sessionLeagueOverrides, {
+    sessions: projectStackedDeckSessions(result.draws, null, settings.sessionLeagueOverrides, {
       fixedStackedDeckPriceChaos: settings.fixedStackedDeckPriceChaos,
       pricingLeagueId: settings.selectedLeagueId,
       profitFilters: settings.profitFilters,
@@ -208,8 +266,8 @@ function configureExternalNavigation(window: BrowserWindow): void {
 async function openExternalUrl(url: string): Promise<void> {
   const parsedUrl = new URL(url);
 
-  if (!externalProtocols.has(parsedUrl.protocol)) {
-    throw new Error(`Unsupported external URL protocol: ${parsedUrl.protocol}`);
+  if (!externalProtocols.has(parsedUrl.protocol) || !externalHosts.has(parsedUrl.hostname.toLowerCase())) {
+    throw new Error(`Unsupported external URL: ${parsedUrl.origin}`);
   }
 
   await shell.openExternal(parsedUrl.toString());
@@ -229,8 +287,19 @@ function isExternalNavigation(url: string): boolean {
   return parsedUrl.origin !== new URL(process.env.VITE_DEV_SERVER_URL).origin;
 }
 
+function resolveUserDataPath(): string {
+  const override = process.env.WRAECLAST_FIELD_NOTES_USER_DATA?.trim();
+  if (!override) {
+    return path.join(app.getPath("appData"), "Wraeclast Field Notes");
+  }
+  if (!path.isAbsolute(override)) {
+    throw new Error("WRAECLAST_FIELD_NOTES_USER_DATA must be an absolute path.");
+  }
+  return path.normalize(override);
+}
+
 app.whenReady().then(async () => {
-  registerIpc();
+  await registerIpc();
   await createWindow();
 });
 

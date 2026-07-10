@@ -1,5 +1,7 @@
-import packageJson from "../../package.json";
+﻿import packageJson from "../../package.json";
 import { APP_RELEASES_URL } from "../shared/appUpdate.js";
+import type { CatalogSnapshot, CollectionRun } from "../domain/collection.js";
+import type { MarketPriceQuote } from "../domain/marketPricing.js";
 import { DEFAULT_CURRENCY_ICONS } from "../shared/currencyIcons.js";
 import { CHALLENGE_LEAGUES, getLeagueById } from "../shared/leagues.js";
 import {
@@ -10,7 +12,7 @@ import {
 } from "../shared/priceSources.js";
 import { normalizeCardKey, sourceUrlsFor } from "../shared/pricing.js";
 import { DEFAULT_PROFIT_FILTERS, normalizeProfitFilters } from "../shared/profitFilters.js";
-import { buildSessions } from "../shared/sessions.js";
+import { projectStackedDeckSessions } from "../features/stackedDeck/sessionProjector.js";
 import type {
   AppInfo,
   AppUpdateInfo,
@@ -86,16 +88,17 @@ const previewDraws: ClientLogDraw[] = [
 const progressListeners = new Set<(progress: ScanProgress) => void>();
 const autoScanResultListeners = new Set<(result: ScanResult) => void>();
 const autoScanErrorListeners = new Set<(message: string) => void>();
+let previewResearchRuns: CollectionRun[] = [];
 
 export function installBrowserPreviewBridge(): void {
-  if ("poeDeck" in window && window.poeDeck) {
+  if ("wraeclastFieldNotes" in window && window.wraeclastFieldNotes) {
     return;
   }
 
   let settings = { ...previewSettings };
   let autoScanTimer: number | null = null;
 
-  window.poeDeck = {
+  window.wraeclastFieldNotes = {
     loadSettings: async () => {
       const serverSettings = await getPreviewJson<Settings>("/settings").catch(() => previewSettings);
       settings = mergeSettings(serverSettings, loadSavedSettings());
@@ -103,7 +106,7 @@ export function installBrowserPreviewBridge(): void {
     },
     saveSettings: async (nextSettings) => {
       settings = nextSettings;
-      localStorage.setItem("poeDeckPreviewSettings", JSON.stringify(settings));
+      localStorage.setItem("wraeclastFieldNotesPreviewSettings", JSON.stringify(settings));
       return settings;
     },
     chooseLogFile: choosePreviewLogFile,
@@ -198,6 +201,26 @@ export function installBrowserPreviewBridge(): void {
     getAppInfo: async () => getPreviewJson<AppInfo>("/app-info").catch(() => previewAppInfo),
     checkForUpdate: async () => getPreviewJson<AppUpdateInfo>("/app-update"),
     getLeagues: async () => getPreviewJson<LeagueInfo[]>("/leagues").catch(() => CHALLENGE_LEAGUES),
+    getCatalog: async () => createPreviewCatalog(),
+    searchCatalogItems: async () => [],
+    listRuns: async (includeArchived = false) =>
+      previewResearchRuns.filter((run) => includeArchived || run.lifecycle !== "archived"),
+    saveRun: async (run) => {
+      previewResearchRuns = [run, ...previewResearchRuns.filter((candidate) => candidate.id !== run.id)];
+      return run;
+    },
+    getMarketQuotes: async (request) =>
+      request.items.map<MarketPriceQuote>((item, index) => ({
+        detailsId: item.detailsId,
+        name: item.name,
+        chaosValue: Number((1.25 + index * 0.75).toFixed(2)),
+        confidence: "high",
+        source: request.options.mode === "hybrid" ? request.options.priority : request.options.mode,
+        sourceUrl: "https://api.poe.watch/exchange/ratios",
+        fetchedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+        fromCache: true
+      })),
     onScanProgress: (listener) => {
       progressListeners.add(listener);
       return () => progressListeners.delete(listener);
@@ -238,7 +261,17 @@ async function runPreviewAutoScan(filePath: string, currentSettings: Settings): 
 
 function loadSavedSettings(): Partial<Settings> {
   try {
-    return JSON.parse(localStorage.getItem("poeDeckPreviewSettings") ?? "{}") as Partial<Settings>;
+    const currentKey = "wraeclastFieldNotesPreviewSettings";
+    const legacyKey = "poeDeckPreviewSettings";
+    let saved = localStorage.getItem(currentKey);
+    if (saved === null) {
+      saved = localStorage.getItem(legacyKey);
+      if (saved !== null) {
+        localStorage.setItem(currentKey, saved);
+        localStorage.removeItem(legacyKey);
+      }
+    }
+    return JSON.parse(saved ?? "{}") as Partial<Settings>;
   } catch {
     return {};
   }
@@ -342,7 +375,7 @@ function createFallbackScanResult(filePath: string, currentSettings: Settings): 
     bytesScanned: 2400,
     cachedBytes: 0,
     draws: previewDraws,
-    sessions: buildSessions(previewDraws, null, currentSettings.sessionLeagueOverrides, {
+    sessions: projectStackedDeckSessions(previewDraws, null, currentSettings.sessionLeagueOverrides, {
       fixedStackedDeckPriceChaos: currentSettings.fixedStackedDeckPriceChaos,
       pricingLeagueId: currentSettings.selectedLeagueId,
       profitFilters: currentSettings.profitFilters,
@@ -418,6 +451,19 @@ function emitAutoScanError(message: string): void {
   for (const listener of autoScanErrorListeners) {
     listener(message);
   }
+}
+
+function createPreviewCatalog(): CatalogSnapshot {
+  const fetchedAt = new Date().toISOString();
+  return {
+    fetchedAt,
+    expiresAt: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
+    templates: [],
+    categories: [],
+    leagues: CHALLENGE_LEAGUES.map((league) => ({ id: league.id, name: league.name, displayName: league.name })),
+    releaseVersions: [],
+    fromCache: true
+  };
 }
 
 function createPreviewSnapshot(leagueId: string, options: PriceSourceOptions): PriceSnapshot {

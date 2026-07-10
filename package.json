@@ -1,7 +1,7 @@
 {
-  "name": "poe-stacked-deck-counter",
+  "name": "wraeclast-field-notes",
   "version": "0.3.0",
-  "description": "Electron app for counting Path of Exile stacked deck openings from Client.txt.",
+  "description": "Local-first field research companion for gathering poe.how Codex strategy data.",
   "author": "C-Pettersson",
   "license": "MIT",
   "type": "module",
@@ -18,29 +18,33 @@
     "release": "release-it"
   },
   "dependencies": {
+    "@trpc/client": "^11.18.0",
+    "@trpc/server": "^11.18.0",
     "@vitejs/plugin-react": "^4.4.1",
     "lucide-react": "^0.475.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "superjson": "^2.2.6",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@release-it/conventional-changelog": "^11.0.1",
-    "@types/node": "^22.13.4",
+    "@types/node": "^24.10.0",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
     "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",
-    "electron": "^34.1.1",
-    "electron-builder": "^25.1.8",
-    "release-it": "^18.1.2",
+    "electron": "^43.1.0",
+    "electron-builder": "^26.15.3",
+    "release-it": "^20.2.1",
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
     "vitest": "^3.0.5",
     "wait-on": "^8.0.2"
   },
   "build": {
-    "appId": "com.cpettersson.poe-stacked-deck-counter",
-    "productName": "PoE Stacked Deck Counter",
+    "appId": "how.poe.fieldnotes",
+    "productName": "Wraeclast Field Notes",
     "directories": {
       "buildResources": "build",
       "output": "release"
@@ -50,20 +54,21 @@
       "package.json"
     ],
     "win": {
-      "signAndEditExecutable": false,
+      "icon": "src/renderer/assets/wraeclast-field-notes.png",
+      "signExecutable": false,
       "target": [
         "portable",
         "zip"
       ]
     },
     "portable": {
-      "artifactName": "${productName}-${version}-portable.${ext}"
+      "artifactName": "Wraeclast-Field-Notes-${version}-portable.${ext}"
     },
     "publish": [
       {
         "provider": "github",
         "owner": "C-Pettersson",
-        "repo": "poe-stacked-deck-counter",
+        "repo": "wraeclast-field-notes",
         "releaseType": "release"
       }
     ]

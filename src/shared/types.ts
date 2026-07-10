@@ -1,4 +1,4 @@
-export type AppTab = "sessions" | "data" | "settings";
+export type AppTab = "collect" | "runs" | "deck-runs" | "deck-data" | "settings";
 export type CurrencyDenomination = "chaos" | "divine";
 export type CurrencyMode = "auto" | "chaos";
 export type ConfidenceFilter = "any" | "exclude-low" | "high-only" | "low-only" | "unknown-only";

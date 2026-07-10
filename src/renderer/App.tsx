@@ -1,98 +1,111 @@
 import type { ReactElement } from "react";
-import { useDeckCounterApp } from "./app/useDeckCounterApp.js";
+import { useFieldNotesApp } from "./app/useFieldNotesApp.js";
 import { AppHeader } from "./components/AppHeader.js";
 import { AppTabs } from "./components/AppTabs.js";
 import { ScanProgressBar } from "./components/ScanProgressBar.js";
 import { StatusStrip } from "./components/StatusStrip.js";
+import { CollectTab } from "./tabs/CollectTab.js";
 import { DataTab } from "./tabs/DataTab.js";
+import { RunsTab } from "./tabs/RunsTab.js";
 import { SessionsTab } from "./tabs/SessionsTab.js";
 import { SettingsTab } from "./tabs/SettingsTab.js";
 
 export function App(): ReactElement {
-  const app = useDeckCounterApp();
+  const app = useFieldNotesApp();
+  const deck = app.deck;
 
-  if (!app.settings) {
-    return <div className="boot">Loading</div>;
+  if (!deck.settings) {
+    return <div className="boot">Opening field notes...</div>;
   }
 
   return (
     <main className="app-shell">
       <AppHeader
-        isScanning={app.isScanning}
-        settings={app.settings}
-        onCurrencyModeChange={(currencyMode) => void app.changeCurrencyMode(currencyMode)}
-        onPriceLeagueChange={(leagueId) => void app.changePriceLeague(leagueId)}
-        onRefreshPrices={app.refreshSelectedPrices}
-        onScanLog={() => void app.scanLog()}
+        isScanning={deck.isScanning}
+        settings={deck.settings}
+        onCurrencyModeChange={(currencyMode) => void deck.changeCurrencyMode(currencyMode)}
+        onPriceLeagueChange={(leagueId) => void deck.changePriceLeague(leagueId)}
+        onRefreshPrices={deck.refreshSelectedPrices}
+        onScanLog={() => void deck.scanLog()}
       />
 
       <AppTabs activeTab={app.activeTab} onTabChange={app.setActiveTab} />
 
-      <StatusStrip
-        currencyMode={app.settings.currencyMode}
-        notice={app.notice}
-        priceSnapshot={app.selectedPriceSnapshot}
-        priceStatus={app.priceStatus}
-        summary={app.summary}
-      />
-
-      {app.isScanning ? <ScanProgressBar progress={app.scanProgress} /> : null}
-
-      {app.activeTab === "sessions" ? (
-        <SessionsTab
-          currencyMode={app.settings.currencyMode}
-          fallbackCurrencySnapshot={app.selectedPriceSnapshot}
-          priceSnapshots={app.priceSnapshots}
-          sessions={app.sessions}
-          selectedSession={app.selectedSession}
-          sessionDeckPriceOverrides={app.settings.sessionDeckPriceOverrides}
-          onSelect={app.selectSession}
-          onLeagueChange={app.changeSessionLeague}
-          onSessionDeckPriceChange={(sessionId, deckPriceChaos) => void app.changeSessionDeckPrice(sessionId, deckPriceChaos)}
-          onDiscord={(session) => void app.copyDiscord(session)}
-          onReddit={(session) => void app.copyReddit(session)}
-          onCopyPoeHow={(session) => void app.copyPoeHow(session)}
-          onSavePoeHow={(session) => void app.savePoeHow(session)}
-          onSaveCsv={(session) => void app.saveCsv(session)}
-          onOpenCardWiki={app.openCardWiki}
-          onToggleCardValue={(cardName) => void app.toggleIgnoredCardValue(cardName)}
+      {app.activeTab === "deck-runs" || app.activeTab === "deck-data" ? (
+        <StatusStrip
+          currencyMode={deck.settings.currencyMode}
+          notice={deck.notice}
+          priceSnapshot={deck.selectedPriceSnapshot}
+          priceStatus={deck.priceStatus}
+          summary={deck.summary}
         />
       ) : null}
 
-      {app.activeTab === "data" ? (
+      {deck.isScanning ? <ScanProgressBar progress={deck.scanProgress} /> : null}
+
+      {app.activeTab === "collect" ? <CollectTab research={app.research} /> : null}
+
+      {app.activeTab === "runs" ? (
+        <RunsTab research={app.research} onEdit={() => app.setActiveTab("collect")} />
+      ) : null}
+
+      {app.activeTab === "deck-runs" ? (
+        <SessionsTab
+          currencyMode={deck.settings.currencyMode}
+          fallbackCurrencySnapshot={deck.selectedPriceSnapshot}
+          priceSnapshots={deck.priceSnapshots}
+          sessions={deck.sessions}
+          selectedSession={deck.selectedSession}
+          sessionDeckPriceOverrides={deck.settings.sessionDeckPriceOverrides}
+          onSelect={deck.selectSession}
+          onLeagueChange={deck.changeSessionLeague}
+          onSessionDeckPriceChange={(sessionId, deckPriceChaos) =>
+            void deck.changeSessionDeckPrice(sessionId, deckPriceChaos)
+          }
+          onDiscord={(session) => void deck.copyDiscord(session)}
+          onReddit={(session) => void deck.copyReddit(session)}
+          onCopyPoeHow={(session) => void deck.copyPoeHow(session)}
+          onSavePoeHow={(session) => void deck.savePoeHow(session)}
+          onSaveCsv={(session) => void deck.saveCsv(session)}
+          onOpenCardWiki={deck.openCardWiki}
+          onToggleCardValue={(cardName) => void deck.toggleIgnoredCardValue(cardName)}
+        />
+      ) : null}
+
+      {app.activeTab === "deck-data" ? (
         <DataTab
-          currencyMode={app.settings.currencyMode}
-          fallbackCurrencySnapshot={app.selectedPriceSnapshot}
-          priceSnapshots={app.priceSnapshots}
-          sessions={app.sessions}
-          selectedSession={app.selectedSession}
-          leagueFilterId={app.dataLeagueFilterId}
-          onLeagueFilterChange={app.changeDataLeagueFilter}
-          onOpenCardWiki={app.openCardWiki}
-          onToggleCardValue={(cardName) => void app.toggleIgnoredCardValue(cardName)}
+          currencyMode={deck.settings.currencyMode}
+          fallbackCurrencySnapshot={deck.selectedPriceSnapshot}
+          priceSnapshots={deck.priceSnapshots}
+          sessions={deck.sessions}
+          selectedSession={deck.selectedSession}
+          leagueFilterId={deck.dataLeagueFilterId}
+          onLeagueFilterChange={deck.changeDataLeagueFilter}
+          onOpenCardWiki={deck.openCardWiki}
+          onToggleCardValue={(cardName) => void deck.toggleIgnoredCardValue(cardName)}
         />
       ) : null}
 
       {app.activeTab === "settings" ? (
         <SettingsTab
-          appInfo={app.appInfo}
-          appUpdateInfo={app.appUpdateInfo}
-          appUpdateStatus={app.appUpdateStatus}
-          isClearingPriceCache={app.isClearingPriceCache}
-          isCheckingForUpdate={app.isCheckingForUpdate}
-          settings={app.settings}
-          priceSnapshots={app.priceSnapshots}
-          onCheckForUpdate={() => void app.checkForAppUpdate()}
-          onClearPriceCache={() => void app.clearPriceCache()}
-          onChooseLog={() => void app.chooseLogFile()}
-          onOpen={app.openExternal}
-          onAutoScanChange={(autoScanEnabled) => void app.changeAutoScanEnabled(autoScanEnabled)}
+          appInfo={deck.appInfo}
+          appUpdateInfo={deck.appUpdateInfo}
+          appUpdateStatus={deck.appUpdateStatus}
+          isClearingPriceCache={deck.isClearingPriceCache}
+          isCheckingForUpdate={deck.isCheckingForUpdate}
+          settings={deck.settings}
+          priceSnapshots={deck.priceSnapshots}
+          onCheckForUpdate={() => void deck.checkForAppUpdate()}
+          onClearPriceCache={() => void deck.clearPriceCache()}
+          onChooseLog={() => void deck.chooseLogFile()}
+          onOpen={deck.openExternal}
+          onAutoScanChange={(autoScanEnabled) => void deck.changeAutoScanEnabled(autoScanEnabled)}
           onFixedStackedDeckPriceChange={(fixedStackedDeckPriceChaos) =>
-            void app.changeFixedStackedDeckPrice(fixedStackedDeckPriceChaos)
+            void deck.changeFixedStackedDeckPrice(fixedStackedDeckPriceChaos)
           }
-          onPriceSourceModeChange={(priceSourceMode) => void app.changePriceSourceMode(priceSourceMode)}
-          onPriceSourcePriorityChange={(priceSourcePriority) => void app.changePriceSourcePriority(priceSourcePriority)}
-          onProfitFiltersChange={(profitFilters) => void app.changeProfitFilters(profitFilters)}
+          onPriceSourceModeChange={(priceSourceMode) => void deck.changePriceSourceMode(priceSourceMode)}
+          onPriceSourcePriorityChange={(priceSourcePriority) => void deck.changePriceSourcePriority(priceSourcePriority)}
+          onProfitFiltersChange={(profitFilters) => void deck.changeProfitFilters(profitFilters)}
         />
       ) : null}
     </main>

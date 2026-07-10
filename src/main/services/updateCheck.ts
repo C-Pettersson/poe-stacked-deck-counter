@@ -1,5 +1,5 @@
 import {
-  APP_LATEST_RELEASE_API_URL,
+  APP_LATEST_RELEASE_API_URLS,
   APP_RELEASES_URL,
   APP_UPDATE_USER_AGENT,
   isVersionNewer,
@@ -20,16 +20,7 @@ export function getAppInfo(version: string): AppInfo {
 }
 
 export async function checkForUpdate(currentVersion: string): Promise<AppUpdateInfo> {
-  const response = await fetch(APP_LATEST_RELEASE_API_URL, {
-    headers: {
-      accept: "application/vnd.github+json",
-      "user-agent": APP_UPDATE_USER_AGENT
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`Update check failed (${response.status}).`);
-  }
+  const response = await fetchLatestRelease();
 
   const payload = (await response.json()) as GitHubReleaseResponse;
   const tagName = typeof payload.tag_name === "string" ? payload.tag_name : "";
@@ -46,4 +37,31 @@ export async function checkForUpdate(currentVersion: string): Promise<AppUpdateI
     checkedAt: new Date().toISOString(),
     updateAvailable: isVersionNewer(latestVersion, currentVersion)
   };
+}
+
+async function fetchLatestRelease(): Promise<Response> {
+  let lastStatus = 0;
+
+  for (const url of APP_LATEST_RELEASE_API_URLS) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          accept: "application/vnd.github+json",
+          "user-agent": APP_UPDATE_USER_AGENT
+        },
+        redirect: "follow",
+        signal: AbortSignal.timeout(10_000)
+      });
+
+      if (response.ok) {
+        return response;
+      }
+
+      lastStatus = response.status;
+    } catch {
+      // Try the legacy repository URL before surfacing the failure.
+    }
+  }
+
+  throw new Error(`Update check failed${lastStatus ? ` (${lastStatus})` : ""}.`);
 }

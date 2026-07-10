@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+﻿import { contextBridge, ipcRenderer } from "electron";
 import type {
   AppInfo,
   AppUpdateInfo,
@@ -9,6 +9,8 @@ import type {
   ScanResult,
   Settings
 } from "../shared/types.js";
+import type { CatalogItem, CatalogSnapshot, CollectionRun } from "../domain/collection.js";
+import type { MarketPriceQuote, MarketPriceRequest } from "../domain/marketPricing.js";
 
 const api = {
   loadSettings: (): Promise<Settings> => ipcRenderer.invoke("settings:load"),
@@ -31,6 +33,12 @@ const api = {
   getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke("app:info"),
   checkForUpdate: (): Promise<AppUpdateInfo> => ipcRenderer.invoke("app:check-update"),
   getLeagues: (): Promise<LeagueInfo[]> => ipcRenderer.invoke("app:leagues"),
+  getCatalog: (forceRefresh = false): Promise<CatalogSnapshot> => ipcRenderer.invoke("catalog:get", forceRefresh),
+  searchCatalogItems: (query: string): Promise<CatalogItem[]> => ipcRenderer.invoke("catalog:search-items", query),
+  listRuns: (includeArchived = false): Promise<CollectionRun[]> => ipcRenderer.invoke("runs:list", includeArchived),
+  saveRun: (run: CollectionRun): Promise<CollectionRun> => ipcRenderer.invoke("runs:save", run),
+  getMarketQuotes: (request: MarketPriceRequest): Promise<MarketPriceQuote[]> =>
+    ipcRenderer.invoke("prices:market-quotes", request),
   onScanProgress: (listener: (progress: ScanProgress) => void): (() => void) => {
     const channelListener = (_event: Electron.IpcRendererEvent, progress: ScanProgress): void => listener(progress);
     ipcRenderer.on("log:scan-progress", channelListener);
@@ -48,4 +56,4 @@ const api = {
   }
 };
 
-contextBridge.exposeInMainWorld("poeDeck", api);
+contextBridge.exposeInMainWorld("wraeclastFieldNotes", api);

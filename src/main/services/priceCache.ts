@@ -21,9 +21,11 @@ const DEFAULT_PRICE_OPTIONS: PriceSourceOptions = {
 
 export class PriceCache {
   private readonly cacheDir: string;
+  private readonly userAgent: string;
 
-  constructor(userDataPath: string) {
+  constructor(userDataPath: string, appVersion = "development") {
     this.cacheDir = path.join(userDataPath, "price-cache");
+    this.userAgent = `wraeclast-field-notes/${appVersion}`;
   }
 
   async getPrices(
@@ -58,13 +60,13 @@ export class PriceCache {
 
   private async fetchSnapshot(league: LeagueInfo, options: PriceSourceOptions): Promise<PriceSnapshot> {
     if (options.mode !== "hybrid") {
-      const sourceSnapshot = await fetchSourceSnapshot(league, options.mode);
+      const sourceSnapshot = await fetchSourceSnapshot(league, options.mode, this.userAgent);
       return createHybridPriceSnapshot(league, { [options.mode]: sourceSnapshot }, options);
     }
 
     const results = await Promise.allSettled([
-      fetchSourceSnapshot(league, "poe-watch"),
-      fetchSourceSnapshot(league, "poe-ninja")
+      fetchSourceSnapshot(league, "poe-watch", this.userAgent),
+      fetchSourceSnapshot(league, "poe-ninja", this.userAgent)
     ]);
     const snapshots: Partial<Record<PriceSource, PriceSnapshot>> = {};
     const failures: string[] = [];
@@ -115,15 +117,15 @@ function normalizeGetPricesArgs(
   };
 }
 
-async function fetchSourceSnapshot(league: LeagueInfo, source: PriceSource): Promise<PriceSnapshot> {
+async function fetchSourceSnapshot(league: LeagueInfo, source: PriceSource, userAgent: string): Promise<PriceSnapshot> {
   if (source === "poe-watch") {
-    const data = await getJson(poeWatchExchangeUrl(league.poeNinjaName), "poe.watch");
+    const data = await getJson(poeWatchExchangeUrl(league.poeNinjaName), "poe.watch", userAgent);
     return createPoeWatchPriceSnapshot(league, data as PoeWatchExchangeRatios);
   }
 
   const [cardsData, currencyData] = await Promise.all([
-    getJson(cardPricesUrl(league.poeNinjaName), "poe.ninja"),
-    getJson(stackedDeckUrl(league.poeNinjaName), "poe.ninja")
+    getJson(cardPricesUrl(league.poeNinjaName), "poe.ninja", userAgent),
+    getJson(stackedDeckUrl(league.poeNinjaName), "poe.ninja", userAgent)
   ]);
   return createPriceSnapshot(league, cardsData as ExchangeOverview, currencyData as CurrencyOverview);
 }
@@ -172,12 +174,13 @@ function getCacheKey(league: LeagueInfo, options: PriceSourceOptions): string {
   return `${league.id}-${options.mode}-${options.priority}`;
 }
 
-async function getJson(url: string, sourceLabel: string): Promise<unknown> {
+async function getJson(url: string, sourceLabel: string, userAgent: string): Promise<unknown> {
   const response = await fetch(url, {
     headers: {
       accept: "application/json",
-      "user-agent": "poe-stacked-deck-counter"
-    }
+      "user-agent": userAgent
+    },
+    signal: AbortSignal.timeout(15_000)
   });
 
   if (!response.ok) {

@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AppInfo,
   AppUpdateInfo,
   LeagueInfo,
@@ -8,10 +8,12 @@ import type {
   ScanResult,
   Settings
 } from "../shared/types.js";
+import type { CatalogItem, CatalogSnapshot, CollectionRun } from "../domain/collection.js";
+import type { MarketPriceQuote, MarketPriceRequest } from "../domain/marketPricing.js";
 
 declare global {
   interface Window {
-    poeDeck: {
+    wraeclastFieldNotes: {
       loadSettings: () => Promise<Settings>;
       saveSettings: (settings: Settings) => Promise<Settings>;
       chooseLogFile: () => Promise<string | null>;
@@ -27,6 +29,11 @@ declare global {
       getAppInfo: () => Promise<AppInfo>;
       checkForUpdate: () => Promise<AppUpdateInfo>;
       getLeagues: () => Promise<LeagueInfo[]>;
+      getCatalog: (forceRefresh?: boolean) => Promise<CatalogSnapshot>;
+      searchCatalogItems: (query: string) => Promise<CatalogItem[]>;
+      listRuns: (includeArchived?: boolean) => Promise<CollectionRun[]>;
+      saveRun: (run: CollectionRun) => Promise<CollectionRun>;
+      getMarketQuotes: (request: MarketPriceRequest) => Promise<MarketPriceQuote[]>;
       onScanProgress: (listener: (progress: ScanProgress) => void) => () => void;
       onAutoScanResult: (listener: (result: ScanResult) => void) => () => void;
       onAutoScanError: (listener: (message: string) => void) => () => void;

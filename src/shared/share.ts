@@ -1,4 +1,5 @@
 import { formatChaos, formatDateRange, formatSignedChaos } from "./format.js";
+import { getLeagueById } from "./leagues.js";
 import { detailsIdFromName } from "./pricing.js";
 import type { DeckSession, SessionCard, SharePayload } from "./types.js";
 
@@ -52,49 +53,45 @@ export function createCsv(session: DeckSession): string {
   return [header, ...rows].join("\n");
 }
 
-export function createPoeHowDraft(session: DeckSession, idFactory = createId): unknown {
+export function createPoeHowDraft(session: DeckSession, appVersion = "development"): unknown {
   const rewards = session.cards.map((card) => ({
-    rowId: idFactory(),
     itemDetailsId: card.detailsId ?? detailsIdFromName(card.name),
     itemName: card.name,
     amount: card.count,
-    weight: 1,
-    exclusiveGroup: 1,
-    icon: card.icon ?? "",
-    group: "Group 1",
-    isTemplate: true
+    provenance: "detector"
   }));
 
   return {
-    version: 2,
-    title: `${session.totalCards} Stacked Decks - ${session.leagueName}`,
-    status: "active",
-    updatedAt: Date.now(),
-    payload: {
-      activeStep: 4,
-      contribution: {
-        comment: `Imported from PoE Stacked Deck Counter. Session ${formatDateRange(session.startAt, session.endAt)}.`,
-        runs: session.totalCards,
-        gameVersion: "",
-        leagueId: session.poeNinjaLeague,
-        rewards,
-        requirements: [],
-        selectedCategoryId: 13,
-        selectedCategoryName: "Stacked Deck",
-        selectedTemplateId: 773,
-        selectedTemplateName: "stacked-deck",
-        selectedTemplateTitle: "Stacked Deck Odds Overview",
-        submitAsPlayer: null
-      }
+    kind: "poehow.codex-draft",
+    schemaVersion: 3,
+    source: {
+      app: "wraeclast-field-notes",
+      version: appVersion,
+      collectionSource: "log_file"
     },
-    metadata: {
+    exportedAt: new Date().toISOString(),
+    run: {
+      id: session.id,
+      title: `${session.totalCards} Stacked Decks - ${session.leagueName}`,
       templateName: "stacked-deck",
-      templateTitle: "Stacked Deck Odds Overview",
-      categoryName: "Stacked Deck",
-      leagueId: session.poeNinjaLeague,
-      lastStep: 4,
-      rewardCount: rewards.length,
-      requirementCount: 0
+      leagueId: session.leagueId,
+      gameVersion: getLeagueById(session.leagueId).version,
+      runs: session.totalCards,
+      duration: Math.max(0, Math.round((Date.parse(session.endAt) - Date.parse(session.startAt)) / 1000)),
+      comment: `Imported from Wraeclast Field Notes. Session ${formatDateRange(session.startAt, session.endAt)}.`,
+      requirements: [
+        {
+          itemDetailsId: "stacked-deck",
+          itemName: "Stacked Deck",
+          amount: session.totalCards,
+          provenance: "detector"
+        }
+      ],
+      rewards,
+      evidence: {
+        observationCount: session.draws.length,
+        detectorAssisted: true
+      }
     }
   };
 }
@@ -122,8 +119,4 @@ function csvCell(value: string | number): string {
   }
 
   return `"${text.replace(/"/g, '""')}"`;
-}
-
-function createId(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `row-${Math.random().toString(36).slice(2)}`;
 }

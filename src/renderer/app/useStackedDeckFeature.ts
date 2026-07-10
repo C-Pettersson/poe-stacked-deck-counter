@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { getCardWikiUrl } from "../../shared/cardMetadata.js";
 import { formatDateTime } from "../../shared/format.js";
 import { normalizeCardKey } from "../../shared/pricing.js";
-import { buildSessions, updateSessionLeagueOverrides } from "../../shared/sessions.js";
+import { updateSessionLeagueOverrides } from "../../shared/sessions.js";
+import { projectStackedDeckSessions } from "../../features/stackedDeck/sessionProjector.js";
 import {
   createCsv,
   createDiscordShare,
@@ -12,7 +13,6 @@ import {
 } from "../../shared/share.js";
 import type {
   AppInfo,
-  AppTab,
   AppUpdateInfo,
   DeckSession,
   PriceSnapshot,
@@ -32,8 +32,7 @@ const initialProgress: ScanProgress = {
   drawsFound: 0
 };
 
-export function useDeckCounterApp() {
-  const [activeTab, setActiveTab] = useState<AppTab>("sessions");
+export function useStackedDeckFeature() {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -51,18 +50,18 @@ export function useDeckCounterApp() {
   const scanResultVersionRef = useRef(0);
 
   useEffect(() => {
-    const unsubscribe = window.poeDeck.onScanProgress(setScanProgress);
-    const unsubscribeAutoScanResult = window.poeDeck.onAutoScanResult((result) => {
+    const unsubscribe = window.wraeclastFieldNotes.onScanProgress(setScanProgress);
+    const unsubscribeAutoScanResult = window.wraeclastFieldNotes.onAutoScanResult((result) => {
       beginScanResultUpdate();
       applyScanResult(result, "Auto scan found");
     });
-    const unsubscribeAutoScanError = window.poeDeck.onAutoScanError((message) => {
+    const unsubscribeAutoScanError = window.wraeclastFieldNotes.onAutoScanError((message) => {
       setNotice(`Automatic scan failed: ${message}`);
     });
     let isMounted = true;
 
-    void window.poeDeck.getAppInfo().then(setAppInfo).catch(() => undefined);
-    void window.poeDeck.loadSettings().then((loaded) => {
+    void window.wraeclastFieldNotes.getAppInfo().then(setAppInfo).catch(() => undefined);
+    void window.wraeclastFieldNotes.loadSettings().then((loaded) => {
       if (!isMounted) {
         return;
       }
@@ -76,7 +75,7 @@ export function useDeckCounterApp() {
       unsubscribe();
       unsubscribeAutoScanResult();
       unsubscribeAutoScanError();
-      void window.poeDeck.stopAutoScan().catch(() => undefined);
+      void window.wraeclastFieldNotes.stopAutoScan().catch(() => undefined);
     };
   }, []);
 
@@ -88,7 +87,7 @@ export function useDeckCounterApp() {
     let isCurrent = true;
     const scanResultVersion = beginScanResultUpdate();
 
-    void window.poeDeck
+    void window.wraeclastFieldNotes
       .loadCachedScan(settings.logPath, settings)
       .then((cachedResult) => {
         if (!isCurrent || !isCurrentScanResultUpdate(scanResultVersion)) {
@@ -116,7 +115,7 @@ export function useDeckCounterApp() {
 
     let isCurrent = true;
 
-    void window.poeDeck.configureAutoScan(settings.logPath, settings).catch((error) => {
+    void window.wraeclastFieldNotes.configureAutoScan(settings.logPath, settings).catch((error) => {
       if (isCurrent && settings.autoScanEnabled) {
         setNotice(error instanceof Error ? error.message : "Automatic scan setup failed.");
       }
@@ -124,7 +123,7 @@ export function useDeckCounterApp() {
 
     return () => {
       isCurrent = false;
-      void window.poeDeck.stopAutoScan().catch(() => undefined);
+      void window.wraeclastFieldNotes.stopAutoScan().catch(() => undefined);
     };
   }, [
     settings?.autoScanEnabled,
@@ -138,7 +137,7 @@ export function useDeckCounterApp() {
 
   const sessions = useMemo(
     () =>
-      buildSessions(scanResult?.draws ?? [], priceSnapshots, settings?.sessionLeagueOverrides ?? {}, {
+      projectStackedDeckSessions(scanResult?.draws ?? [], priceSnapshots, settings?.sessionLeagueOverrides ?? {}, {
         fixedStackedDeckPriceChaos: settings?.fixedStackedDeckPriceChaos,
         pricingLeagueId: settings?.selectedLeagueId,
         profitFilters: settings?.profitFilters,
@@ -170,7 +169,7 @@ export function useDeckCounterApp() {
 
   async function updateSettings(next: Settings): Promise<void> {
     setSettings(next);
-    await window.poeDeck.saveSettings(next);
+    await window.wraeclastFieldNotes.saveSettings(next);
   }
 
   async function chooseLogFile(): Promise<void> {
@@ -178,7 +177,7 @@ export function useDeckCounterApp() {
       return;
     }
 
-    const filePath = await window.poeDeck.chooseLogFile();
+    const filePath = await window.wraeclastFieldNotes.chooseLogFile();
     if (filePath) {
       await updateSettings({ ...settings, logPath: filePath });
     }
@@ -195,7 +194,7 @@ export function useDeckCounterApp() {
     const scanResultVersion = beginScanResultUpdate();
 
     try {
-      const result = await window.poeDeck.scanLog(settings.logPath, settings);
+      const result = await window.wraeclastFieldNotes.scanLog(settings.logPath, settings);
       if (!isCurrentScanResultUpdate(scanResultVersion)) {
         return;
       }
@@ -218,7 +217,7 @@ export function useDeckCounterApp() {
     setPriceStatus(forceRefresh ? "Refreshing prices..." : "Loading prices...");
 
     try {
-      const snapshot = await window.poeDeck.getPrices(
+      const snapshot = await window.wraeclastFieldNotes.getPrices(
         leagueId,
         {
           mode: priceSettings.priceSourceMode,
@@ -242,7 +241,7 @@ export function useDeckCounterApp() {
     setPriceStatus("Clearing price cache...");
 
     try {
-      await window.poeDeck.clearPriceCache();
+      await window.wraeclastFieldNotes.clearPriceCache();
       setPriceSnapshots({});
       setPriceStatus("Price cache cleared.");
     } catch (error) {
@@ -257,7 +256,7 @@ export function useDeckCounterApp() {
     setAppUpdateStatus("Checking for updates...");
 
     try {
-      const updateInfo = await window.poeDeck.checkForUpdate();
+      const updateInfo = await window.wraeclastFieldNotes.checkForUpdate();
       setAppUpdateInfo(updateInfo);
       setAppUpdateStatus(
         updateInfo.updateAvailable
@@ -432,7 +431,7 @@ export function useDeckCounterApp() {
   }
 
   async function copyPayload(payload: { title: string; text: string }): Promise<void> {
-    await window.poeDeck.copyText(payload.text);
+    await window.wraeclastFieldNotes.copyText(payload.text);
     setNotice(`${payload.title} copied.`);
   }
 
@@ -445,14 +444,14 @@ export function useDeckCounterApp() {
   }
 
   async function copyPoeHow(session: DeckSession): Promise<void> {
-    await window.poeDeck.copyText(stringifyDraft(createPoeHowDraft(session)));
+    await window.wraeclastFieldNotes.copyText(stringifyDraft(createPoeHowDraft(session, appInfo?.version)));
     setNotice("poe.how draft copied.");
   }
 
   async function savePoeHow(session: DeckSession): Promise<void> {
-    const saved = await window.poeDeck.saveTextFile(
+    const saved = await window.wraeclastFieldNotes.saveTextFile(
       `${session.id}-poe-how-draft.json`,
-      stringifyDraft(createPoeHowDraft(session))
+      stringifyDraft(createPoeHowDraft(session, appInfo?.version))
     );
     if (saved) {
       setNotice(`Saved ${saved}`);
@@ -460,14 +459,14 @@ export function useDeckCounterApp() {
   }
 
   async function saveCsv(session: DeckSession): Promise<void> {
-    const saved = await window.poeDeck.saveTextFile(`${session.id}.csv`, createCsv(session));
+    const saved = await window.wraeclastFieldNotes.saveTextFile(`${session.id}.csv`, createCsv(session));
     if (saved) {
       setNotice(`Saved ${saved}`);
     }
   }
 
   function openExternal(url: string): void {
-    void window.poeDeck.openExternal(url);
+    void window.wraeclastFieldNotes.openExternal(url);
   }
 
   function openCardWiki(cardName: string): void {
@@ -475,7 +474,6 @@ export function useDeckCounterApp() {
   }
 
   return {
-    activeTab,
     appInfo,
     appUpdateInfo,
     appUpdateStatus,
@@ -509,11 +507,11 @@ export function useDeckCounterApp() {
     savePoeHow,
     scanLog,
     scanProgress,
+    scanRevision: scanResult?.scannedAt ?? null,
     selectSession,
     selectedPriceSnapshot,
     selectedSession,
     sessions,
-    setActiveTab,
     settings,
     summary,
     toggleIgnoredCardValue

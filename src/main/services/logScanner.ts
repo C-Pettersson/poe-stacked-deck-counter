@@ -2,11 +2,10 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { parseCardNameFromLine, parseTimestampFromLogLine, CARD_DRAW_MARKER } from "../../shared/clientLog.js";
 import type { ClientLogDraw, ScanMode, ScanProgress } from "../../shared/types.js";
-import type { CachedPendingDraw, LogScanSnapshot } from "./logScanCache.js";
-import { LogScanCache } from "./logScanCache.js";
+import type { CachedPendingDraw, LogScanCachePort, LogScanSnapshot } from "./logScanCache.js";
 
 interface ScanClientLogOptions {
-  cache?: LogScanCache;
+  cache?: LogScanCachePort;
   onProgress?: (progress: ScanProgress) => void;
 }
 
@@ -78,7 +77,7 @@ export async function scanClientLog(filePath: string, options: ScanClientLogOpti
   return streamResult;
 }
 
-export async function loadCachedClientLog(filePath: string, cache: LogScanCache): Promise<ClientLogScan | null> {
+export async function loadCachedClientLog(filePath: string, cache: LogScanCachePort): Promise<ClientLogScan | null> {
   const cached = await cache.read(filePath);
   return cached ? createCachedScan(cached, "restored") : null;
 }
@@ -87,7 +86,7 @@ async function canResumeFromCache(
   filePath: string,
   currentFileSize: number,
   cached: LogScanSnapshot,
-  cache: LogScanCache
+  cache: LogScanCachePort
 ): Promise<boolean> {
   if (cached.fileSize > currentFileSize) {
     return false;

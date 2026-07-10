@@ -6,7 +6,7 @@ import type { ClientLogDraw, DeckSession, PriceSnapshot, ProfitFilters, SessionC
 export const SESSION_GAP_MS = 2 * 60 * 60 * 1000;
 type PriceSource = PriceSnapshot | Record<string, PriceSnapshot> | null;
 
-interface BuildSessionsOptions {
+export interface BuildSessionsOptions {
   pricingLeagueId?: string;
   fixedStackedDeckPriceChaos?: number | null;
   profitFilters?: ProfitFilters;
