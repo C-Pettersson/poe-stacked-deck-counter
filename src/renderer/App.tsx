@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import { useFieldNotesApp } from "./app/useFieldNotesApp.js";
 import { AppHeader } from "./components/AppHeader.js";
-import { AppTabs } from "./components/AppTabs.js";
+import { AppSidebar } from "./components/AppSidebar.js";
 import { ScanProgressBar } from "./components/ScanProgressBar.js";
 import { StatusStrip } from "./components/StatusStrip.js";
 import { CollectTab } from "./tabs/CollectTab.js";
@@ -20,16 +20,22 @@ export function App(): ReactElement {
 
   return (
     <main className="app-shell">
-      <AppHeader
+      <AppSidebar
+        activeTab={app.activeTab}
         isScanning={deck.isScanning}
-        settings={deck.settings}
-        onCurrencyModeChange={(currencyMode) => void deck.changeCurrencyMode(currencyMode)}
-        onPriceLeagueChange={(leagueId) => void deck.changePriceLeague(leagueId)}
-        onRefreshPrices={deck.refreshSelectedPrices}
         onScanLog={() => void deck.scanLog()}
+        onTabChange={app.setActiveTab}
       />
 
-      <AppTabs activeTab={app.activeTab} onTabChange={app.setActiveTab} />
+      <section className="workspace-shell">
+        <AppHeader
+          settings={deck.settings}
+          onCurrencyModeChange={(currencyMode) => void deck.changeCurrencyMode(currencyMode)}
+          onPriceLeagueChange={(leagueId) => void deck.changePriceLeague(leagueId)}
+          onRefreshPrices={deck.refreshSelectedPrices}
+        />
+
+        <div className="workspace-page">
 
       {app.activeTab === "deck-runs" || app.activeTab === "deck-data" ? (
         <StatusStrip
@@ -119,6 +125,8 @@ export function App(): ReactElement {
           onProfitFiltersChange={(profitFilters) => void deck.changeProfitFilters(profitFilters)}
         />
       ) : null}
+        </div>
+      </section>
     </main>
   );
 }
