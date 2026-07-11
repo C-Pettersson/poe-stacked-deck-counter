@@ -7,6 +7,8 @@
   "type": "module",
   "main": "dist/main/main.js",
   "scripts": {
+    "assets:sync:cards": "node tools/sync-divination-card-art.mjs",
+    "assets:sync:items": "node tools/sync-poe-item-data.mjs",
     "dev": "npm run build && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "npm run typecheck && npm run clean && vite build && tsc -p tsconfig.node.json",

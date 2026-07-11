@@ -50,12 +50,33 @@ describe("public poe.how catalog", () => {
     const cache = new MemoryCatalogCache();
     const client: PoeHowPublicClient = {
       query: async (path) => path === "items.search"
-        ? { items: [{ detailsId: "chaos-orb", name: "Chaos Orb", category: "Currency" }] }
+        ? {
+            items: [{
+              detailsId: "enlighten-support-4c",
+              name: "Enlighten Support",
+              category: "SkillGem",
+              tags: [
+                { id: 1, name: "level-4", hidden: true },
+                { id: 2, name: "quality-0", hidden: true },
+                { id: 3, name: "corrupted", hidden: true }
+              ]
+            }]
+          }
         : []
     };
-    await expect(new PoeHowCatalogService(cache, "1.0.0", client).searchItems("chaos")).resolves.toMatchObject([
-      { detailsId: "chaos-orb", name: "Chaos Orb" }
+    const itemDetails = { enrichItems: vi.fn(async (items) => items) };
+    await expect(new PoeHowCatalogService(cache, "1.0.0", client, itemDetails).searchItems("enlighten")).resolves.toMatchObject([
+      {
+        detailsId: "enlighten-support-4c",
+        name: "Enlighten Support",
+        tags: [
+          { name: "level-4", hidden: true },
+          { name: "quality-0", hidden: true },
+          { name: "corrupted", hidden: true }
+        ]
+      }
     ]);
+    expect(itemDetails.enrichItems).toHaveBeenCalledOnce();
   });
 });
 

@@ -10,6 +10,7 @@ import type {
   TemplateItem,
   TemplateSnapshot
 } from "../../domain/collection.js";
+import { LocalPoeItemDetailsClient, type PoeItemDetailsClient } from "./poeItemData.js";
 
 const POEHOW_TRPC_URL = "https://poe.how/api/trpc";
 const CATALOG_TTL_MS = 6 * 60 * 60 * 1000;
@@ -17,6 +18,12 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 const nullableString = z.string().nullable().optional();
+const itemTagSchema = z
+  .object({
+    name: z.string().min(1),
+    hidden: z.boolean().optional()
+  })
+  .passthrough();
 const itemSchema = z
   .object({
     detailsId: z.string().min(1),
@@ -24,7 +31,8 @@ const itemSchema = z
     baseType: nullableString,
     category: nullableString,
     itemType: nullableString,
-    icon: nullableString
+    icon: nullableString,
+    tags: z.array(itemTagSchema).optional()
   })
   .passthrough();
 
@@ -100,8 +108,14 @@ export interface PoeHowPublicClient {
 
 export class PoeHowCatalogService {
   private readonly client: PoeHowPublicClient;
+  private readonly itemDetailsClient: PoeItemDetailsClient;
 
-  constructor(private readonly cache: CatalogCachePort, appVersion: string, client?: PoeHowPublicClient) {
+  constructor(
+    private readonly cache: CatalogCachePort,
+    appVersion: string,
+    client?: PoeHowPublicClient,
+    itemDetailsClient: PoeItemDetailsClient = new LocalPoeItemDetailsClient()
+  ) {
     this.client = client ?? createTRPCUntypedClient<any>({
       links: [
         httpBatchLink({
@@ -115,6 +129,7 @@ export class PoeHowCatalogService {
         })
       ]
     });
+    this.itemDetailsClient = itemDetailsClient;
   }
 
   async getCatalog(forceRefresh = false): Promise<CatalogSnapshot> {
@@ -161,7 +176,12 @@ export class PoeHowCatalogService {
       page: 1,
       limit: 30
     });
-    return itemSearchResponseSchema.parse(payload).items.map(mapItem);
+    const items = itemSearchResponseSchema.parse(payload).items.map(mapItem);
+    try {
+      return await this.itemDetailsClient.enrichItems(items);
+    } catch {
+      return items;
+    }
   }
 }
 
@@ -214,7 +234,8 @@ function mapItem(item: z.infer<typeof itemSchema>): CatalogItem {
     baseType: item.baseType ?? undefined,
     category: item.category,
     itemType: item.itemType ?? undefined,
-    icon: item.icon ?? undefined
+    icon: item.icon ?? undefined,
+    tags: item.tags?.map((tag) => ({ name: tag.name, hidden: tag.hidden }))
   };
 }
 

@@ -19,6 +19,12 @@ export interface MarketDatasetCache {
 }
 
 type FetchLike = typeof fetch;
+type PoeNinjaDatasetKind = "exchange" | "stash-item";
+
+interface PoeNinjaDatasetRequest {
+  datasetKey: string;
+  kind: PoeNinjaDatasetKind;
+}
 
 export class MarketPriceService {
   constructor(
@@ -74,20 +80,31 @@ export class MarketPriceService {
 
   private async getPoeNinjaQuotes(request: MarketPriceRequest, forceRefresh: boolean): Promise<MarketPriceQuote[]> {
     const quotes: MarketPriceQuote[] = [];
-    const itemsByDataset = new Map<string, CatalogItem[]>();
+    const itemsByDataset = new Map<string, { kind: PoeNinjaDatasetKind; items: CatalogItem[] }>();
     for (const item of request.items) {
-      const datasetKey = poeNinjaDatasetFor(item);
-      if (!datasetKey) continue;
-      itemsByDataset.set(datasetKey, [...(itemsByDataset.get(datasetKey) ?? []), item]);
+      const dataset = poeNinjaDatasetFor(item);
+      if (!dataset) continue;
+      const existing = itemsByDataset.get(dataset.datasetKey);
+      itemsByDataset.set(dataset.datasetKey, {
+        kind: dataset.kind,
+        items: [...(existing?.items ?? []), item]
+      });
     }
 
-    for (const [datasetKey, items] of itemsByDataset) {
-      const url = new URL("/poe1/api/economy/exchange/current/overview", POE_NINJA_BASE_URL);
+    for (const [datasetKey, { kind, items }] of itemsByDataset) {
+      const url = new URL(
+        kind === "stash-item"
+          ? "/poe1/api/economy/stash/current/item/overview"
+          : "/poe1/api/economy/exchange/current/overview",
+        POE_NINJA_BASE_URL
+      );
       url.searchParams.set("league", request.leagueName);
       url.searchParams.set("type", datasetKey);
       try {
         const dataset = await this.getDataset("poe-ninja", request.leagueName, datasetKey, url.toString(), forceRefresh);
-        quotes.push(...mapPoeNinjaQuotes(items, dataset));
+        quotes.push(
+          ...(kind === "stash-item" ? mapPoeNinjaItemQuotes(items, dataset) : mapPoeNinjaQuotes(items, dataset))
+        );
       } catch {
         // One unsupported poe.ninja dataset must not hide quotes from the other datasets or poe.watch.
       }
@@ -171,6 +188,22 @@ function mapPoeNinjaQuotes(items: CatalogItem[], dataset: MarketPriceDataset): M
   return quotes;
 }
 
+function mapPoeNinjaItemQuotes(items: CatalogItem[], dataset: MarketPriceDataset): MarketPriceQuote[] {
+  const payload = asRecord(dataset.payload);
+  const lines = Array.isArray(payload?.lines) ? payload.lines.map(asRecord).filter(isRecord) : [];
+  const byDetailsId = groupBy(lines, (line) => String(line.detailsId ?? ""));
+  const quotes: MarketPriceQuote[] = [];
+
+  for (const item of items) {
+    const matches = byDetailsId.get(item.detailsId) ?? [];
+    if (matches.length !== 1) continue;
+    const value = positiveNumber(matches[0].chaosValue);
+    if (value === null) continue;
+    quotes.push(createQuote(item, value, confidenceFrom(matches[0]), dataset));
+  }
+  return quotes;
+}
+
 function createQuote(
   item: CatalogItem,
   chaosValue: number,
@@ -190,22 +223,26 @@ function createQuote(
   };
 }
 
-function poeNinjaDatasetFor(item: CatalogItem): string | null {
+function poeNinjaDatasetFor(item: CatalogItem): PoeNinjaDatasetRequest | null {
   const haystack = `${item.category ?? ""} ${item.itemType ?? ""} ${item.baseType ?? ""}`.toLowerCase();
-  const mappings: Array<[RegExp, string]> = [
-    [/divination|card/, "DivinationCard"],
-    [/currency|stacked deck/, "Currency"],
-    [/fragment/, "Fragment"],
-    [/scarab/, "Scarab"],
-    [/essence/, "Essence"],
-    [/fossil/, "Fossil"],
-    [/resonator/, "Resonator"],
-    [/oil/, "Oil"],
-    [/incubator/, "Incubator"],
-    [/tattoo/, "Tattoo"],
-    [/omen/, "Omen"]
+  const mappings: Array<[RegExp, string, PoeNinjaDatasetKind]> = [
+    [/uniqueaccessory|unique accessory/, "UniqueAccessory", "stash-item"],
+    [/uniquearmour|unique armour/, "UniqueArmour", "stash-item"],
+    [/uniqueweapon|unique weapon/, "UniqueWeapon", "stash-item"],
+    [/divination|card/, "DivinationCard", "exchange"],
+    [/currency|stacked deck/, "Currency", "exchange"],
+    [/fragment/, "Fragment", "exchange"],
+    [/scarab/, "Scarab", "exchange"],
+    [/essence/, "Essence", "exchange"],
+    [/fossil/, "Fossil", "exchange"],
+    [/resonator/, "Resonator", "exchange"],
+    [/oil/, "Oil", "exchange"],
+    [/incubator/, "Incubator", "exchange"],
+    [/tattoo/, "Tattoo", "exchange"],
+    [/omen/, "Omen", "exchange"]
   ];
-  return mappings.find(([pattern]) => pattern.test(haystack))?.[1] ?? null;
+  const match = mappings.find(([pattern]) => pattern.test(haystack));
+  return match ? { datasetKey: match[1], kind: match[2] } : null;
 }
 
 async function fetchJsonBounded(url: string, fetchImpl: FetchLike, appVersion: string): Promise<unknown> {

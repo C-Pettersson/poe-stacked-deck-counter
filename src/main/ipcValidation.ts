@@ -3,13 +3,37 @@ import type { CollectionRun } from "../domain/collection.js";
 import type { MarketPriceRequest } from "../domain/marketPricing.js";
 import type { Settings } from "../shared/types.js";
 
+const itemGameDataSchema = z.object({
+  rarity: z.string().max(100).optional(),
+  properties: z.array(z.string().max(1000)).max(100),
+  requirements: z.array(z.string().max(1000)).max(100),
+  implicitModifiers: z.array(z.string().max(1000)).max(100),
+  explicitModifiers: z.array(z.string().max(1000)).max(100),
+  description: z.string().max(5000).optional(),
+  flavourText: z.string().max(5000).optional(),
+  helpText: z.string().max(5000).optional(),
+  itemLevel: z.number().int().nonnegative().max(1000).optional(),
+  influences: z.array(z.enum([
+    "shaper", "elder", "crusader", "hunter", "redeemer", "warlord", "searing-exarch", "eater-of-worlds"
+  ])).max(2).optional(),
+  corrupted: z.boolean().optional(),
+  synthesised: z.boolean().optional(),
+  fractured: z.boolean().optional(),
+  mirrored: z.boolean().optional(),
+  source: z.object({
+    kind: z.enum(["path-of-building", "repoe", "reward-specification"]),
+    version: z.string().max(200)
+  }).optional()
+});
+
 export const catalogItemSchema = z.object({
   detailsId: z.string().trim().min(1).max(300),
   name: z.string().trim().min(1).max(300),
   baseType: z.string().max(300).optional(),
   category: z.string().max(200).nullable().optional(),
   itemType: z.string().max(200).optional(),
-  icon: z.string().max(2000).optional()
+  icon: z.string().max(2000).optional(),
+  gameData: itemGameDataSchema.optional()
 });
 
 const templateItemSchema = z.object({
@@ -49,6 +73,10 @@ const runItemSchema = z.object({
   templateItemId: z.number().int().positive().optional(),
   comment: z.string().max(1000).optional(),
   icon: z.string().max(2000).optional(),
+  baseType: z.string().max(300).optional(),
+  category: z.string().max(200).nullable().optional(),
+  itemType: z.string().max(200).optional(),
+  gameData: itemGameDataSchema.optional(),
   priceOverrideChaos: z.number().finite().nonnegative().optional()
 });
 

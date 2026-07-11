@@ -18,6 +18,16 @@ export interface CatalogItem {
   category?: string | null;
   itemType?: string;
   icon?: string;
+  tags?: CatalogItemTag[];
+  gameData?: ItemGameData;
+}
+
+import type { GameItemData } from "../itemTooltip/model.js";
+export type ItemGameData = GameItemData;
+
+export interface CatalogItemTag {
+  name: string;
+  hidden?: boolean;
 }
 
 export interface TemplateItem {
@@ -81,6 +91,10 @@ export interface RunItem {
   templateItemId?: number;
   comment?: string;
   icon?: string;
+  baseType?: string;
+  category?: string | null;
+  itemType?: string;
+  gameData?: ItemGameData;
   priceOverrideChaos?: number;
 }
 
@@ -159,7 +173,11 @@ export function createRunItem(
     provenance,
     templateItemId: entry?.id,
     comment: entry?.comment,
-    icon: item.icon
+    icon: item.icon,
+    baseType: item.baseType,
+    category: item.category,
+    itemType: item.itemType,
+    gameData: item.gameData
   };
 }
 

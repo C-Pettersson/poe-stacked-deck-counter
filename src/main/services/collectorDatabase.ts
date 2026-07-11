@@ -15,7 +15,7 @@ import {
   type LogScanSnapshot
 } from "./logScanCache.js";
 
-const DATABASE_SCHEMA_VERSION = 3;
+const DATABASE_SCHEMA_VERSION = 4;
 const SCAN_CACHE_VERSION = 1;
 
 export class CollectorDatabase {
@@ -99,8 +99,8 @@ export class CollectorDatabase {
       const insertItem = this.database.prepare(
         `INSERT INTO run_items (
            id, run_id, role, details_id, name, amount, provenance, template_item_id,
-           comment, icon, price_override_chaos, row_order
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           comment, icon, item_metadata, price_override_chaos, row_order
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       );
 
       run.items.forEach((item, index) => insertRunItem(insertItem, run.id, item, index));
@@ -400,6 +400,7 @@ export class CollectorDatabase {
         template_item_id INTEGER,
         comment TEXT,
         icon TEXT,
+        item_metadata TEXT,
         price_override_chaos REAL,
         row_order INTEGER NOT NULL DEFAULT 0
       );
@@ -469,6 +470,13 @@ export class CollectorDatabase {
     }>;
     if (!checkpointColumns.some((column) => column.name === "pending_encounter")) {
       this.database.exec("ALTER TABLE scan_checkpoints ADD COLUMN pending_encounter TEXT");
+    }
+
+    const runItemColumns = this.database.prepare("PRAGMA table_info(run_items)").all() as unknown as Array<{
+      name: string;
+    }>;
+    if (!runItemColumns.some((column) => column.name === "item_metadata")) {
+      this.database.exec("ALTER TABLE run_items ADD COLUMN item_metadata TEXT");
     }
 
     this.setMeta("schema_version", String(DATABASE_SCHEMA_VERSION));
@@ -558,6 +566,12 @@ function insertRunItem(statement: StatementSync, runId: string, item: RunItem, i
     item.templateItemId ?? null,
     item.comment ?? null,
     item.icon ?? null,
+    JSON.stringify({
+      baseType: item.baseType,
+      category: item.category,
+      itemType: item.itemType,
+      gameData: item.gameData
+    }),
     item.priceOverrideChaos ?? null,
     index
   );
@@ -589,6 +603,7 @@ function mapRun(row: RunRow, itemStatement: StatementSync, observationStatement:
 }
 
 function mapRunItem(row: RunItemRow): RunItem {
+  const metadata = parseNullableJson<Pick<RunItem, "baseType" | "category" | "itemType" | "gameData">>(row.item_metadata) ?? {};
   return {
     id: row.id,
     role: row.role,
@@ -599,6 +614,7 @@ function mapRunItem(row: RunItemRow): RunItem {
     templateItemId: row.template_item_id === null ? undefined : Number(row.template_item_id),
     comment: row.comment ?? undefined,
     icon: row.icon ?? undefined,
+    ...metadata,
     priceOverrideChaos: row.price_override_chaos === null ? undefined : Number(row.price_override_chaos)
   };
 }
@@ -688,6 +704,7 @@ interface RunItemRow {
   template_item_id: number | null;
   comment: string | null;
   icon: string | null;
+  item_metadata: string | null;
   price_override_chaos: number | null;
 }
 

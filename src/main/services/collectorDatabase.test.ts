@@ -16,13 +16,36 @@ describe("CollectorDatabase", () => {
     const directory = await temporaryDirectory();
     const run = createCollectionRun(null, { now: new Date("2026-07-10T10:00:00.000Z") });
     run.title = "Harvest study";
+    run.items.push({
+      id: "item-lycosidae",
+      role: "reward",
+      detailsId: "lycosidae-rawhide-tower-shield",
+      name: "Lycosidae",
+      baseType: "Rawhide Tower Shield",
+      itemType: "Shield",
+      amount: 1,
+      provenance: "manual",
+      gameData: {
+        rarity: "Unique",
+        properties: ["Chance to Block: (29-31)%"],
+        requirements: ["Requires Level 11, 33 Str"],
+        implicitModifiers: ["+(10-20) to maximum Life"],
+        explicitModifiers: ["Your hits can't be Evaded"],
+        flavourText: "A true predator does not chase; It waits."
+      }
+    });
 
     const first = new CollectorDatabase(directory);
     first.saveRun(run);
     first.close();
 
     const second = new CollectorDatabase(directory);
-    expect(second.listRuns()).toMatchObject([{ id: run.id, title: "Harvest study", lifecycle: "draft" }]);
+    expect(second.listRuns()).toMatchObject([{
+      id: run.id,
+      title: "Harvest study",
+      lifecycle: "draft",
+      items: [{ name: "Lycosidae", baseType: "Rawhide Tower Shield", gameData: { rarity: "Unique" } }]
+    }]);
     run.lifecycle = "archived";
     second.saveRun(run);
     expect(second.listRuns()).toEqual([]);
