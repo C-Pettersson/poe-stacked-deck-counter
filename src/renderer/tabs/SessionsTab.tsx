@@ -37,6 +37,36 @@ type SessionDetailProps = SessionsTabProps & {
   onShowIgnoredChange: (showIgnored: boolean) => void;
 };
 
+export type StackedDeckRunDetailProps = Omit<SessionsTabProps, "sessions" | "selectedSession" | "onSelect"> & {
+  session: DeckSession;
+};
+
+export function StackedDeckRunDetail({ session, ...props }: StackedDeckRunDetailProps): ReactElement {
+  const [cardSearch, setCardSearch] = useState("");
+  const [showIgnored, setShowIgnored] = useState(false);
+  const selectedCurrencySnapshot = getSessionCurrencySnapshot(
+    session,
+    props.priceSnapshots,
+    props.fallbackCurrencySnapshot
+  );
+
+  return (
+    <section className="session-detail stacked-deck-run-detail">
+      <SessionDetail
+        {...props}
+        sessions={[session]}
+        selectedSession={session}
+        onSelect={() => undefined}
+        cardSearch={cardSearch}
+        showIgnored={showIgnored}
+        selectedCurrencySnapshot={selectedCurrencySnapshot}
+        onCardSearchChange={setCardSearch}
+        onShowIgnoredChange={setShowIgnored}
+      />
+    </section>
+  );
+}
+
 export function SessionsTab(props: SessionsTabProps): ReactElement {
   const [cardSearch, setCardSearch] = useState("");
   const [showIgnored, setShowIgnored] = useState(false);

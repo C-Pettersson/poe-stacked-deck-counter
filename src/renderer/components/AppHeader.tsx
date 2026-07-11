@@ -1,24 +1,29 @@
 import { RefreshCw } from "lucide-react";
 import type { ReactElement } from "react";
 import { CHALLENGE_LEAGUES } from "../../shared/leagues.js";
-import type { Settings } from "../../shared/types.js";
+import type { AppTab, Settings } from "../../shared/types.js";
+import { APP_NAVIGATION } from "../appNavigation.js";
 
 export function AppHeader({
+  activeTab,
   settings,
   onCurrencyModeChange,
   onPriceLeagueChange,
   onRefreshPrices
 }: {
+  activeTab: AppTab;
   settings: Settings;
   onCurrencyModeChange: (currencyMode: Settings["currencyMode"]) => void;
   onPriceLeagueChange: (leagueId: string) => void;
   onRefreshPrices: () => void;
 }): ReactElement {
+  const activeDestination = APP_NAVIGATION.find((item) => item.id === activeTab);
+
   return (
     <header className="workspace-header">
       <div className="workspace-context">
         <span>Field desk</span>
-        <strong>Research ledger</strong>
+        <strong>{activeDestination?.label ?? "Research ledger"}</strong>
         <small title={settings.logPath}>Local archive</small>
       </div>
       <div className="header-actions">

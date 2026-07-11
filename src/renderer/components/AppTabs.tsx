@@ -1,41 +1,28 @@
-import { BarChart3, BookOpen, History, Settings as SettingsIcon, Table2 } from "lucide-react";
+import { BarChart3, BookOpen, LibraryBig, Settings as SettingsIcon } from "lucide-react";
 import type { ReactElement } from "react";
 import type { AppTab } from "../../shared/types.js";
+import { APP_NAVIGATION } from "../appNavigation.js";
 import { TabButton } from "./TabButton.js";
+
+const TAB_ICONS: Record<AppTab, ReactElement> = {
+  collect: <BookOpen size={18} />,
+  runs: <LibraryBig size={18} />,
+  insights: <BarChart3 size={18} />,
+  settings: <SettingsIcon size={18} />
+};
 
 export function AppTabs({ activeTab, onTabChange }: { activeTab: AppTab; onTabChange: (tab: AppTab) => void }): ReactElement {
   return (
     <nav className="tabs" aria-label="Sections">
-      <TabButton
-        active={activeTab === "collect"}
-        icon={<BookOpen size={18} />}
-        label="Collect"
-        onClick={() => onTabChange("collect")}
-      />
-      <TabButton
-        active={activeTab === "runs"}
-        icon={<History size={18} />}
-        label="Runs"
-        onClick={() => onTabChange("runs")}
-      />
-      <TabButton
-        active={activeTab === "deck-runs"}
-        icon={<BarChart3 size={18} />}
-        label="Deck Runs"
-        onClick={() => onTabChange("deck-runs")}
-      />
-      <TabButton
-        active={activeTab === "deck-data"}
-        icon={<Table2 size={18} />}
-        label="Deck Data"
-        onClick={() => onTabChange("deck-data")}
-      />
-      <TabButton
-        active={activeTab === "settings"}
-        icon={<SettingsIcon size={18} />}
-        label="Settings"
-        onClick={() => onTabChange("settings")}
-      />
+      {APP_NAVIGATION.map((item) => (
+        <TabButton
+          active={activeTab === item.id}
+          icon={TAB_ICONS[item.id]}
+          key={item.id}
+          label={item.label}
+          onClick={() => onTabChange(item.id)}
+        />
+      ))}
     </nav>
   );
 }

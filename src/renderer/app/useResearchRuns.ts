@@ -46,7 +46,7 @@ export function useResearchRuns(
     let current = true;
     setIsLoading(true);
 
-    void Promise.all([window.wraeclastFieldNotes.getCatalog(), window.wraeclastFieldNotes.listRuns()])
+    void Promise.all([window.wraeclastFieldNotes.getCatalog(), window.wraeclastFieldNotes.listRuns(true)])
       .then(([nextCatalog, nextRuns]) => {
         if (!current) return;
         setCatalog(nextCatalog);
@@ -143,7 +143,7 @@ export function useResearchRuns(
   async function archiveSavedRun(run: CollectionRun): Promise<void> {
     const archived = archiveRun(run);
     await window.wraeclastFieldNotes.saveRun(archived);
-    setRuns((current) => current.filter((candidate) => candidate.id !== run.id));
+    setRuns((current) => [archived, ...current.filter((candidate) => candidate.id !== run.id)]);
     if (activeRun?.id === run.id) setActiveRun(null);
     setNotice("Field study archived.");
   }
