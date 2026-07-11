@@ -187,7 +187,7 @@ export function SettingsTab(props: {
         </button>
       </article>
       <article className="settings-card">
-        <h2>Pricing Options</h2>
+        <h2>Market Pricing</h2>
         <label className="field-shell">
           <span>Price source</span>
           <select
@@ -209,17 +209,6 @@ export function SettingsTab(props: {
             <option value="poe-watch">poe.watch</option>
             <option value="poe-ninja">poe.ninja</option>
           </select>
-        </label>
-        <label className="field-shell">
-          <span>Fixed deck price (chaos)</span>
-          <input
-            min="0"
-            placeholder="Price in chaos"
-            step="0.1"
-            type="number"
-            value={props.settings.fixedStackedDeckPriceChaos ?? ""}
-            onChange={(event) => props.onFixedStackedDeckPriceChange(parseOptionalChaosInput(event.target.value))}
-          />
         </label>
         <label className="field-shell">
           <span>Minimum value per card</span>
@@ -255,6 +244,21 @@ export function SettingsTab(props: {
             <option value="low-only">Low only</option>
             <option value="unknown-only">Unknown only</option>
           </select>
+        </label>
+      </article>
+      <article className="settings-card">
+        <h2>Stacked Deck Pricing</h2>
+        <p>Leave the fixed price blank to use the current market price for Stacked Decks.</p>
+        <label className="field-shell">
+          <span>Fixed price per deck (chaos)</span>
+          <input
+            min="0"
+            placeholder="Use market price"
+            step="0.1"
+            type="number"
+            value={props.settings.fixedStackedDeckPriceChaos ?? ""}
+            onChange={(event) => props.onFixedStackedDeckPriceChange(parseOptionalChaosInput(event.target.value))}
+          />
         </label>
       </article>
       <article className="settings-card">

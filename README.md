@@ -16,6 +16,7 @@ The app automatically detects stacked-deck draws and supported endgame encounter
 - Scans large logs and performs database work in a worker so Electron's main process stays responsive.
 - Fetches prices directly from poe.watch and poe.ninja, caches them for 12 hours, and keeps stale quotes during transient outages.
 - Exports Codex draft v3 without local paths, raw log lines, account data, or prices.
+- Shows reusable in-game-style item hovers backed by local base, unique, modifier, influence, and divination reward data.
 - Leaves authentication, reconciliation, review, and submission on poe.how.
 
 ## Public integration boundary
@@ -36,6 +37,8 @@ All collection data stays on the machine unless the user explicitly copies or sa
 
 This project is designed for passive, read-only observation. It does not inject into or automate Path of Exile, read process memory, inspect packets, send inputs or chat commands, or act as a game client. It is not reviewed, endorsed, or approved by Grinding Gear Games. Users should check the current [Path of Exile terms](https://www.pathofexile.com/legal/terms-of-use-and-privacy-policy) when in doubt.
 
+Path of Exile and all related artwork, lore, names, and other game content are the property of Grinding Gear Games. Bundled divination-card artwork is used only to identify cards in this unofficial community tool; Grinding Gear Games does not endorse or sponsor this project.
+
 ## Development
 
 ```bash
@@ -51,6 +54,8 @@ npm run typecheck
 npm run build
 npm run dist
 ```
+
+Game item data is generated through the package-shaped `src/itemTooltip/` boundary. See [item tooltip data architecture](./docs/item-tooltip-data.md) for source pins, refresh commands, and extraction guidance.
 
 The Electron preload API is exposed as `window.wraeclastFieldNotes`. Local application data is stored under `%APPDATA%/Wraeclast Field Notes`; the first launch probes legacy Stacked Deck Counter locations without deleting or changing them.
 

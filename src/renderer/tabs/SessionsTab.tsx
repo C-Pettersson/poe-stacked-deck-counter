@@ -7,6 +7,7 @@ import { CurrencyAmount } from "../CurrencyAmount.js";
 import { getSessionCurrencySnapshot } from "../app/sessionSummary.js";
 import { filterCardsByIgnoredVisibility, filterCardsBySearch } from "../cardFilter.js";
 import { CardIcon } from "../components/CardIcon.js";
+import { CardItemHover } from "../components/CardItemHover.js";
 import { EmptyState } from "../components/EmptyState.js";
 import { Metric } from "../components/Metric.js";
 
@@ -277,7 +278,15 @@ function SessionDetail(props: SessionDetailProps): ReactElement {
 
             return (
               <article className="div-card" key={card.name}>
-                <CardIcon />
+                <CardItemHover
+                  card={card}
+                  className="session-card-hover-trigger"
+                  currencyMode={props.currencyMode}
+                  currencySnapshot={props.selectedCurrencySnapshot}
+                  totalCards={selectedSession.totalCards}
+                >
+                  <CardIcon cardName={card.name} />
+                </CardItemHover>
                 <div className="card-body">
                   <div className="card-title-row">
                     <h3>{card.name}</h3>
@@ -293,6 +302,7 @@ function SessionDetail(props: SessionDetailProps): ReactElement {
                       </button>
                       <button
                         aria-label={card.isValueIgnored ? `Count ${card.name} value` : `Ignore ${card.name} value`}
+                        aria-pressed={card.isValueIgnored}
                         className={card.isValueIgnored ? "card-icon-button active" : "card-icon-button"}
                         title={card.isValueIgnored ? `Count ${card.name} value` : `Ignore ${card.name} value`}
                         type="button"

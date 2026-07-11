@@ -16,6 +16,8 @@ import {
 } from "../app/dataLeagueFilter.js";
 import { getSessionsCurrencySnapshot } from "../app/sessionSummary.js";
 import { filterCardsByIgnoredVisibility, filterCardsBySearch } from "../cardFilter.js";
+import { CardIcon } from "../components/CardIcon.js";
+import { CardItemHover } from "../components/CardItemHover.js";
 import {
   DEFAULT_DATA_SORT,
   getNextDataSort,
@@ -179,6 +181,7 @@ export function DataTab({
                       </button>
                       <button
                         aria-label={card.isValueIgnored ? `Count ${card.name} value` : `Ignore ${card.name} value`}
+                        aria-pressed={card.isValueIgnored}
                         className={card.isValueIgnored ? "card-icon-button active" : "card-icon-button"}
                         title={card.isValueIgnored ? `Count ${card.name} value` : `Ignore ${card.name} value`}
                         type="button"
@@ -189,9 +192,18 @@ export function DataTab({
                     </td>
                     <td>
                       <div className="data-card-cell">
-                        <div className="data-card-name-row">
-                          <span>{card.name}</span>
-                        </div>
+                        <CardItemHover
+                          card={card}
+                          className="data-card-hover-trigger"
+                          currencyMode={currencyMode}
+                          currencySnapshot={currencySnapshot}
+                          totalCards={totalCards}
+                        >
+                          <span className="data-card-name-row">
+                            <CardIcon cardName={card.name} compact />
+                            <span>{card.name}</span>
+                          </span>
+                        </CardItemHover>
                       </div>
                     </td>
                     <td>{card.count.toLocaleString()}</td>

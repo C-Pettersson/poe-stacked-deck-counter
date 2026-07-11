@@ -1,6 +1,8 @@
 ﻿import packageJson from "../../package.json";
 import { APP_RELEASES_URL } from "../shared/appUpdate.js";
-import type { CatalogSnapshot, CollectionRun } from "../domain/collection.js";
+import { createCollectionRun, type CatalogItem, type CatalogSnapshot, type CollectionRun } from "../domain/collection.js";
+import itemData from "../itemTooltip/generated/poe-item-data.json";
+import { assembleRewardSpecification, ItemDataResolver, type ItemDataSet } from "../itemTooltip/index.js";
 import type { MarketPriceQuote } from "../domain/marketPricing.js";
 import { DEFAULT_CURRENCY_ICONS } from "../shared/currencyIcons.js";
 import { CHALLENGE_LEAGUES, getLeagueById } from "../shared/leagues.js";
@@ -12,7 +14,7 @@ import {
 } from "../shared/priceSources.js";
 import { normalizeCardKey, sourceUrlsFor } from "../shared/pricing.js";
 import { DEFAULT_PROFIT_FILTERS, normalizeProfitFilters } from "../shared/profitFilters.js";
-import { projectStackedDeckSessions } from "../features/stackedDeck/sessionProjector.js";
+import { projectStackedDeckRun, projectStackedDeckSessions } from "../features/stackedDeck/sessionProjector.js";
 import { defaultEncounterNotificationSettings } from "../features/events/encounterCatalog.js";
 import type {
   AppInfo,
@@ -84,13 +86,79 @@ const previewDraws: ClientLogDraw[] = [
     lineNumber: 206,
     timestamp: "2026-01-15T21:15:01.000Z",
     cardName: "The Nurse"
+  },
+  {
+    id: "preview-7",
+    lineNumber: 207,
+    timestamp: "2026-01-15T21:15:02.000Z",
+    cardName: "A Familiar Call"
+  },
+  {
+    id: "preview-8",
+    lineNumber: 208,
+    timestamp: "2026-01-15T21:15:03.000Z",
+    cardName: "Lachrymal Necrosis"
   }
 ];
+
+const previewItemResolver = new ItemDataResolver(itemData as ItemDataSet);
+const previewCatalogItems: CatalogItem[] = [{
+  detailsId: "lycosidae-rawhide-tower-shield",
+  name: "Lycosidae",
+  baseType: "Rawhide Tower Shield",
+  category: "UniqueArmour",
+  itemType: "Shield",
+  icon: "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQXJtb3Vycy9TaGllbGRzL0x5Y29zaWRhZSIsInciOjIsImgiOjQsInNjYWxlIjoxfV0/ec38e32a56/Lycosidae.png",
+  tags: [{ name: "unique", hidden: false }],
+  gameData: previewItemResolver.resolveUnique("Lycosidae", "Rawhide Tower Shield")
+}, {
+  detailsId: "putembos-mountain-topaz-ring",
+  name: "Putembo's Mountain",
+  baseType: "Topaz Ring",
+  category: "UniqueAccessory",
+  itemType: "Ring",
+  icon: "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvUmluZ3MvQmx1ZUNvbXBvbmVudCIsInciOjEsImgiOjEsInNjYWxlIjoxfV0/086886e893/BlueComponent.png",
+  tags: [{ name: "unique", hidden: false }],
+  gameData: previewItemResolver.resolveUnique("Putembo's Mountain", "Topaz Ring")
+}, {
+  detailsId: "jewellery-of-farrul",
+  name: "Jewellery of Farrul",
+  baseType: "Jewellery",
+  category: "Magic",
+  itemType: "Jewellery",
+  tags: [{ name: "magic", hidden: false }, { name: "shaper", hidden: true }, { name: "hunter", hidden: true }],
+  gameData: assembleRewardSpecification({
+    name: "Jewellery of Farrul",
+    rarity: "magic",
+    properties: ["Item Level: 100"],
+    implicitModifiers: [],
+    influences: ["shaper", "hunter"],
+    corrupted: false,
+    synthesised: false,
+    itemLevel: 100
+  })
+}, {
+  detailsId: "jewel-corrupted-blood-implicit-corrupted",
+  name: "Jewel",
+  baseType: "Jewel",
+  category: "Rare",
+  itemType: "Jewel",
+  tags: [{ name: "corrupted", hidden: false }],
+  gameData: assembleRewardSpecification({
+    name: "Jewel",
+    rarity: "rare",
+    properties: [],
+    implicitModifiers: ["Corrupted Blood cannot be inflicted on you"],
+    influences: [],
+    corrupted: true,
+    synthesised: false
+  })
+}];
 
 const progressListeners = new Set<(progress: ScanProgress) => void>();
 const autoScanResultListeners = new Set<(result: ScanResult) => void>();
 const autoScanErrorListeners = new Set<(message: string) => void>();
-let previewResearchRuns: CollectionRun[] = [];
+let previewResearchRuns: CollectionRun[] = createPreviewResearchRuns();
 
 export function installBrowserPreviewBridge(): void {
   if ("wraeclastFieldNotes" in window && window.wraeclastFieldNotes) {
@@ -204,7 +272,12 @@ export function installBrowserPreviewBridge(): void {
     checkForUpdate: async () => getPreviewJson<AppUpdateInfo>("/app-update"),
     getLeagues: async () => getPreviewJson<LeagueInfo[]>("/leagues").catch(() => CHALLENGE_LEAGUES),
     getCatalog: async () => createPreviewCatalog(),
-    searchCatalogItems: async () => [],
+    searchCatalogItems: async (query) => {
+      const normalized = query.trim().toLowerCase();
+      return previewCatalogItems.filter((item) =>
+        item.name.toLowerCase().includes(normalized) || item.baseType?.toLowerCase().includes(normalized)
+      );
+    },
     listRuns: async (includeArchived = false) =>
       previewResearchRuns.filter((run) => includeArchived || run.lifecycle !== "archived"),
     saveRun: async (run) => {
@@ -462,11 +535,76 @@ function createPreviewCatalog(): CatalogSnapshot {
   return {
     fetchedAt,
     expiresAt: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
-    templates: [],
-    categories: [],
+    templates: [
+      createPreviewTemplate(1, "maven-encounter", "The Maven", 1, "Record Maven encounter costs and rewards."),
+      createPreviewTemplate(2, "the-feared", "The Feared", 2, "Track invitation attempts and their outcomes."),
+      createPreviewTemplate(3, "stacked-deck", "Stacked Decks", 3, "Research returns from opening Stacked Decks.")
+    ],
+    categories: [
+      { id: 1, name: "bosses", label: "Bosses", description: "Pinnacle and endgame boss encounters." },
+      { id: 2, name: "invitations", label: "Invitations", description: "Maven invitations and arena encounters." },
+      { id: 3, name: "divination-cards", label: "Divination Cards", description: "Card sets, Stacked Decks, and turn-ins." }
+    ],
     leagues: CHALLENGE_LEAGUES.map((league) => ({ id: league.id, name: league.name, displayName: league.name })),
     releaseVersions: [],
     fromCache: true
+  };
+}
+
+function createPreviewResearchRuns(): CollectionRun[] {
+  const catalog = createPreviewCatalog();
+  const deckTemplate = catalog.templates.find((template) => template.name === "stacked-deck") ?? null;
+  const deckRuns = projectStackedDeckSessions(previewDraws, null, {}, { pricingLeagueId: previewSettings.selectedLeagueId })
+    .map((session, index) => projectStackedDeckRun(session, deckTemplate, new Date(`2026-01-16T0${index + 1}:00:00.000Z`)));
+  const encounterTemplate = {
+    ...catalog.templates[0],
+    name: "client-log-maven",
+    categoryName: "Automatic encounter"
+  };
+  const encounter = {
+    ...createCollectionRun(encounterTemplate, { now: new Date("2026-01-14T20:00:00.000Z") }),
+    id: "client-log-preview-maven",
+    title: "The Maven drops",
+    lifecycle: "draft" as const,
+    origin: "detector" as const,
+    notes: "Preview encounter awaiting drop entry."
+  };
+  const mapStudy = {
+    ...createCollectionRun(null, { now: new Date("2026-01-13T18:00:00.000Z") }),
+    id: "preview-map-study",
+    title: "T16 map return study",
+    lifecycle: "completed" as const,
+    notes: "Custom mapping study used to preview the general research shelf."
+  };
+  const archivedStudy = {
+    ...createCollectionRun(null, { now: new Date("2025-12-28T18:00:00.000Z") }),
+    id: "preview-archived-study",
+    title: "Legacy scarab notes",
+    lifecycle: "archived" as const,
+    notes: "Archived preview volume."
+  };
+
+  return [...deckRuns, encounter, mapStudy, archivedStudy];
+}
+
+function createPreviewTemplate(
+  id: number,
+  name: string,
+  title: string,
+  categoryId: number,
+  description: string
+): CatalogSnapshot["templates"][number] {
+  return {
+    id,
+    name,
+    title,
+    description,
+    revision: `preview-${id}`,
+    categoryId,
+    fixedResult: false,
+    allowRequirementSubmission: true,
+    requirements: [],
+    rewards: []
   };
 }
 
@@ -572,6 +710,28 @@ function createPreviewSnapshot(leagueId: string, options: PriceSourceOptions): P
         confidence: "high",
         source,
         change7d: 3.5
+      },
+      "a familiar call": {
+        id: "a-familiar-call",
+        name: "A Familiar Call",
+        detailsId: "a-familiar-call",
+        chaosValue: 12,
+        volumeChaosValue: 11,
+        hasConfidence: true,
+        confidence: "high",
+        source,
+        change7d: 2.1
+      },
+      "lachrymal necrosis": {
+        id: "lachrymal-necrosis",
+        name: "Lachrymal Necrosis",
+        detailsId: "lachrymal-necrosis",
+        chaosValue: 3.5,
+        volumeChaosValue: 3,
+        hasConfidence: true,
+        confidence: "high",
+        source,
+        change7d: -1.2
       }
     }
   };
