@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/C-Pettersson/poe-stacked-deck-counter/compare/v0.3.0...v0.4.0) (2026-07-11)
+
+### ⚠ BREAKING CHANGES
+
+* the app identity, user-data location, preload API, and poe.how export schema have changed.
+
+### Features
+
+* added contribute documentation ([3d5b464](https://github.com/C-Pettersson/poe-stacked-deck-counter/commit/3d5b464f71c1bb4bc9cbb06a7fbd8f3ec7ba36e7))
+* **data:** add local Path of Exile item metadata ([64f5b57](https://github.com/C-Pettersson/poe-stacked-deck-counter/commit/64f5b57ce89afc0411cd555c76985921b04623a2))
+* **events:** automate encounter drop tracking ([e32de1d](https://github.com/C-Pettersson/poe-stacked-deck-counter/commit/e32de1d114f09e7f722cf6c5825c6070c3fc0ebc))
+* **library:** organize saved runs by study type ([7dbeedc](https://github.com/C-Pettersson/poe-stacked-deck-counter/commit/7dbeedc5ab347ed745af8b23b71e4c29c47d55cc))
+* transform app into Wraeclast Field Notes ([44ab341](https://github.com/C-Pettersson/poe-stacked-deck-counter/commit/44ab341e486904914445ce878be492bcbb004a37))
+* **ui:** add research books and rich item previews ([51d9797](https://github.com/C-Pettersson/poe-stacked-deck-counter/commit/51d979768a931d94baca6d5da370f04cbf02b58f))
+* **ui:** redesign app as a smoked expedition journal ([9d65d25](https://github.com/C-Pettersson/poe-stacked-deck-counter/commit/9d65d25c7f94a2726cec5718c5a00ae185cbe91e))
+
 ## [0.3.0](https://github.com/C-Pettersson/poe-stacked-deck-counter/compare/v0.2.2...v0.3.0) (2026-07-07)
 
 ### Features
