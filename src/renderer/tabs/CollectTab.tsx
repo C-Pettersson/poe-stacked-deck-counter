@@ -54,9 +54,7 @@ export function CollectTab({ research }: { research: ResearchRuns }): ReactEleme
     <section className="research-layout">
       <div className="panel research-hero">
         <div>
-          <span className="eyebrow">Wraeclast Field Notes</span>
           <h2>Choose what you are researching</h2>
-          <p>Start from a poe.how strategy template or create unlinked notes. Everything stays local until you export.</p>
         </div>
         <div className="research-actions">
           <button type="button" onClick={() => research.createRun(null)}>

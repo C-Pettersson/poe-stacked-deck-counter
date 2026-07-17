@@ -1936,14 +1936,6 @@ h3 {
   text-shadow: 0 1px #050403;
 }
 
-.sidebar-brand-copy p {
-  margin-top: 9px;
-  color: #a89775;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
 .tabs {
   display: grid;
   gap: 5px;

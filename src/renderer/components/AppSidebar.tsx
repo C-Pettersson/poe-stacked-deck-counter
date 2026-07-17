@@ -23,7 +23,6 @@ export function AppSidebar({
         </div>
         <div className="sidebar-brand-copy">
           <h1>Wraeclast Field Notes</h1>
-          <p>Field research for the poe.how Codex.</p>
         </div>
       </div>
 
