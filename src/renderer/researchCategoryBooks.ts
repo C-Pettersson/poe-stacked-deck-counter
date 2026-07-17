@@ -1,4 +1,4 @@
-import type { CatalogCategory, TemplateSnapshot } from "../domain/collection.js";
+import { isTemplateReportable, type CatalogCategory, type TemplateSnapshot } from "../domain/collection.js";
 
 export type ResearchCategoryId = number | "uncategorized";
 
@@ -11,13 +11,14 @@ export function buildResearchCategoryBooks(
   categories: CatalogCategory[],
   templates: TemplateSnapshot[]
 ): ResearchCategoryBook[] {
+  const reportableTemplates = templates.filter(isTemplateReportable);
   const books: ResearchCategoryBook[] = categories
     .map((category) => ({
       ...category,
-      templateCount: templates.filter((template) => template.categoryId === category.id).length
+      templateCount: reportableTemplates.filter((template) => template.categoryId === category.id).length
     }))
     .filter((category) => category.templateCount > 0);
-  const uncategorizedCount = templates.filter((template) => template.categoryId === null).length;
+  const uncategorizedCount = reportableTemplates.filter((template) => template.categoryId === null).length;
 
   if (uncategorizedCount > 0) {
     books.push({
@@ -47,6 +48,6 @@ export function filterTemplatesByResearchCategory(
       template.title.toLowerCase().includes(normalizedQuery) ||
       template.name.toLowerCase().includes(normalizedQuery);
 
-    return belongsToCategory && matchesQuery;
+    return isTemplateReportable(template) && belongsToCategory && matchesQuery;
   });
 }

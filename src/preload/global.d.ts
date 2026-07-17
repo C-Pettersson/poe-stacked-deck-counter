@@ -2,6 +2,7 @@
   AppInfo,
   AppUpdateInfo,
   LeagueInfo,
+  NotificationTestResult,
   PriceSnapshot,
   PriceSourceOptions,
   ScanProgress,
@@ -29,6 +30,7 @@ declare global {
       getAppInfo: () => Promise<AppInfo>;
       checkForUpdate: () => Promise<AppUpdateInfo>;
       getLeagues: () => Promise<LeagueInfo[]>;
+      testNotification: () => Promise<NotificationTestResult>;
       getCatalog: (forceRefresh?: boolean) => Promise<CatalogSnapshot>;
       searchCatalogItems: (query: string) => Promise<CatalogItem[]>;
       listRuns: (includeArchived?: boolean) => Promise<CollectionRun[]>;

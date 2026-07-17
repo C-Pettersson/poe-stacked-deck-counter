@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createCodexDraftV3, stringifyCodexDraft } from "../../application/codexDraft.js";
+import { canReportRun, createCodexDraftV3, stringifyCodexDraft } from "../../application/codexDraft.js";
 import {
   addRunItem,
   archiveRun,
@@ -166,6 +166,10 @@ export function useResearchRuns(
   async function copyDraft(run?: CollectionRun): Promise<void> {
     const target = run ?? activeRun;
     if (!target) return;
+    if (!canReportRun(target)) {
+      setNotice("Fixed-result strategies cannot be reported to poe.how.");
+      return;
+    }
     const exported = touchRun(target, { exportedAt: new Date().toISOString() });
     await window.wraeclastFieldNotes.copyText(stringifyCodexDraft(createCodexDraftV3(exported, appVersion)));
     await window.wraeclastFieldNotes.saveRun(exported);
@@ -177,6 +181,10 @@ export function useResearchRuns(
   async function saveDraft(run?: CollectionRun): Promise<void> {
     const target = run ?? activeRun;
     if (!target) return;
+    if (!canReportRun(target)) {
+      setNotice("Fixed-result strategies cannot be reported to poe.how.");
+      return;
+    }
     const content = stringifyCodexDraft(createCodexDraftV3(target, appVersion));
     const path = await window.wraeclastFieldNotes.saveTextFile(`${target.id}-codex-draft-v3.json`, content);
     if (path) setNotice(`Saved ${path}`);

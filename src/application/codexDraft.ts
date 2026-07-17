@@ -1,4 +1,4 @@
-import type { CollectionRun, RunItem } from "../domain/collection.js";
+import { isTemplateReportable, type CollectionRun, type RunItem } from "../domain/collection.js";
 
 export const CODEX_DRAFT_KIND = "poehow.codex-draft";
 export const CODEX_DRAFT_SCHEMA_VERSION = 3;
@@ -40,7 +40,15 @@ export interface CodexDraftItem {
   provenance: RunItem["provenance"];
 }
 
+export function canReportRun(run: CollectionRun): boolean {
+  return isTemplateReportable(run.template);
+}
+
 export function createCodexDraftV3(run: CollectionRun, appVersion: string, now = new Date()): CodexDraftV3 {
+  if (!canReportRun(run)) {
+    throw new Error("Fixed-result strategies cannot be reported to poe.how.");
+  }
+
   return {
     kind: CODEX_DRAFT_KIND,
     schemaVersion: CODEX_DRAFT_SCHEMA_VERSION,

@@ -7,7 +7,7 @@ import { normalizePriceSourceOptions } from "../shared/priceSources.js";
 import { projectStackedDeckSessions } from "../features/stackedDeck/sessionProjector.js";
 import type { CollectionRun } from "../domain/collection.js";
 import type { MarketPriceRequest } from "../domain/marketPricing.js";
-import type { ScanResult, Settings } from "../shared/types.js";
+import type { NotificationTestResult, ScanResult, Settings } from "../shared/types.js";
 import { AutoScanController } from "./services/autoScan.js";
 import {
   collectionRunSchema,
@@ -33,6 +33,11 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
+const APP_USER_MODEL_ID = "how.poe.fieldnotes";
+const TOAST_ACTIVATOR_CLSID = "{6F0F83AC-174C-4EA4-B257-78CD6A68F4C1}";
+const appIconPath = isDev
+  ? path.join(app.getAppPath(), "src/renderer/assets/wraeclast-field-notes.png")
+  : path.join(process.resourcesPath, "wraeclast-field-notes.png");
 const externalProtocols = new Set(["https:"]);
 const externalHosts = new Set([
   "poe.how",
@@ -49,6 +54,7 @@ app.setPath("userData", resolveUserDataPath());
 
 let mainWindow: BrowserWindow | null = null;
 let collectorWorker: CollectorWorkerClient | null = null;
+let windowsNotificationSetupError: string | null = null;
 
 async function createWindow(): Promise<void> {
   mainWindow = new BrowserWindow({
@@ -58,6 +64,7 @@ async function createWindow(): Promise<void> {
     minHeight: 720,
     backgroundColor: "#101417",
     title: "Wraeclast Field Notes",
+    icon: appIconPath,
     webPreferences: {
       preload: path.join(__dirname, "../preload/preload.cjs"),
       contextIsolation: true,
@@ -237,11 +244,19 @@ async function registerIpc(): Promise<void> {
   ipcMain.handle("app:check-update", () => checkForUpdate(app.getVersion()));
 
   ipcMain.handle("app:leagues", () => CHALLENGE_LEAGUES);
+
+  ipcMain.handle("notifications:test", () => testEncounterNotification());
 }
 
-function showEncounterNotification(message: EncounterNotificationMessage): void {
-  if (!Notification.isSupported()) return;
+function showEncounterNotification(message: EncounterNotificationMessage): boolean {
+  if (!Notification.isSupported()) return false;
 
+  const notification = createEncounterNotification(message);
+  notification.show();
+  return true;
+}
+
+function createEncounterNotification(message: EncounterNotificationMessage): Notification {
   const notification = new Notification({
     title: message.title,
     body: message.body,
@@ -253,7 +268,47 @@ function showEncounterNotification(message: EncounterNotificationMessage): void 
     mainWindow.show();
     mainWindow.focus();
   });
-  notification.show();
+  return notification;
+}
+
+function testEncounterNotification(): Promise<NotificationTestResult> {
+  if (!Notification.isSupported()) {
+    return Promise.resolve({ status: "unsupported", message: "Native notifications are not supported on this system." });
+  }
+
+  return new Promise((resolve) => {
+    const notification = createEncounterNotification({
+      encounterId: "test",
+      observationId: "test",
+      trigger: "exited",
+      title: "Wraeclast Field Notes",
+      body: "Test successful. Encounter notifications are ready.",
+      sound: true
+    });
+    let settled = false;
+    const finish = (result: NotificationTestResult): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve(result);
+    };
+
+    notification.once("show", () => finish({
+      status: "shown",
+      message: process.platform === "win32"
+        ? "Windows accepted the notification. If it is hidden, check Do Not Disturb and Windows notification settings."
+        : "The operating system accepted the notification."
+    }));
+    notification.once("failed", (_event, error) => finish({
+      status: "failed",
+      message: windowsNotificationSetupError ?? `The operating system rejected the notification: ${error}`
+    }));
+    const timeout = setTimeout(() => finish({
+      status: "failed",
+      message: windowsNotificationSetupError ?? "The operating system did not confirm that the notification was shown."
+    }), 2_000);
+    notification.show();
+  });
 }
 
 function createScanResult(filePath: string, result: ClientLogScan, settings: Settings): ScanResult {
@@ -328,11 +383,45 @@ function resolveUserDataPath(): string {
   return path.normalize(override);
 }
 
+async function ensureWindowsNotificationShortcut(): Promise<void> {
+  if (process.platform !== "win32") return;
+
+  try {
+    const programsDirectory = path.join(app.getPath("appData"), "Microsoft", "Windows", "Start Menu", "Programs");
+    await mkdir(programsDirectory, { recursive: true });
+    const shortcutName = app.isPackaged ? "Wraeclast Field Notes.lnk" : "Wraeclast Field Notes Development.lnk";
+    const shortcutTarget = app.isPackaged
+      ? process.env.PORTABLE_EXECUTABLE_FILE?.trim() || process.execPath
+      : path.join(app.getAppPath(), "node_modules", "electron", "dist", path.basename(process.execPath));
+    const shortcutCreated = shell.writeShortcutLink(
+      path.join(programsDirectory, shortcutName),
+      "create",
+      {
+        target: shortcutTarget,
+        args: app.isPackaged ? "" : `"${app.getAppPath()}"`,
+        cwd: path.dirname(shortcutTarget),
+        description: "Wraeclast Field Notes",
+        icon: shortcutTarget,
+        iconIndex: 0,
+        appUserModelId: APP_USER_MODEL_ID,
+        toastActivatorClsid: TOAST_ACTIVATOR_CLSID
+      }
+    );
+    if (!shortcutCreated) {
+      windowsNotificationSetupError = "Windows could not create the Start Menu registration required for notifications.";
+    }
+  } catch (error) {
+    windowsNotificationSetupError = `Windows notification setup failed: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
 if (process.platform === "win32") {
-  app.setAppUserModelId("how.poe.fieldnotes");
+  app.setAppUserModelId(APP_USER_MODEL_ID);
+  app.setToastActivatorCLSID(TOAST_ACTIVATOR_CLSID);
 }
 
 app.whenReady().then(async () => {
+  await ensureWindowsNotificationShortcut();
   await registerIpc();
   await createWindow();
 });

@@ -57,6 +57,10 @@ export interface TemplateSnapshot {
   rewards: TemplateItem[];
 }
 
+export function isTemplateReportable(template: TemplateSnapshot | null): boolean {
+  return template?.fixedResult !== true;
+}
+
 export interface CatalogLeague {
   id: string;
   name: string;

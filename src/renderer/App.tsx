@@ -67,6 +67,7 @@ export function App(): ReactElement {
           onClearPriceCache={() => void deck.clearPriceCache()}
           onChooseLog={() => void deck.chooseLogFile()}
           onOpen={deck.openExternal}
+          onTestNotification={() => window.wraeclastFieldNotes.testNotification()}
           onAutoScanChange={(autoScanEnabled) => void deck.changeAutoScanEnabled(autoScanEnabled)}
           onEncounterNotificationsChange={(encounterNotifications) =>
             void deck.changeEncounterNotifications(encounterNotifications)

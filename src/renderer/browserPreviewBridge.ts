@@ -21,6 +21,7 @@ import type {
   AppUpdateInfo,
   ClientLogDraw,
   LeagueInfo,
+  NotificationTestResult,
   PriceSnapshot,
   PriceSourceOptions,
   ScanProgress,
@@ -271,6 +272,7 @@ export function installBrowserPreviewBridge(): void {
     getAppInfo: async () => getPreviewJson<AppInfo>("/app-info").catch(() => previewAppInfo),
     checkForUpdate: async () => getPreviewJson<AppUpdateInfo>("/app-update"),
     getLeagues: async () => getPreviewJson<LeagueInfo[]>("/leagues").catch(() => CHALLENGE_LEAGUES),
+    testNotification: showPreviewTestNotification,
     getCatalog: async () => createPreviewCatalog(),
     searchCatalogItems: async (query) => {
       const normalized = query.trim().toLowerCase();
@@ -309,6 +311,24 @@ export function installBrowserPreviewBridge(): void {
       return () => autoScanErrorListeners.delete(listener);
     }
   };
+}
+
+async function showPreviewTestNotification(): Promise<NotificationTestResult> {
+  if (!("Notification" in window)) {
+    return { status: "unsupported", message: "Browser notifications are not supported." };
+  }
+
+  const permission = window.Notification.permission === "default"
+    ? await window.Notification.requestPermission()
+    : window.Notification.permission;
+  if (permission !== "granted") {
+    return { status: "failed", message: "Browser notification permission was not granted." };
+  }
+
+  new window.Notification("Wraeclast Field Notes", {
+    body: "Test successful. Encounter notifications are ready."
+  });
+  return { status: "shown", message: "The browser accepted the test notification." };
 }
 
 async function runPreviewAutoScan(filePath: string, currentSettings: Settings): Promise<void> {

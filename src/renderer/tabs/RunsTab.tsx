@@ -1,5 +1,6 @@
 import { Archive, BookOpen, ClipboardCopy, FileDown, Pencil } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactElement } from "react";
+import { canReportRun } from "../../application/codexDraft.js";
 import type { CollectionRun, RunLifecycle, RunItem } from "../../domain/collection.js";
 import type { useResearchRuns } from "../app/useResearchRuns.js";
 import type { useStackedDeckFeature } from "../app/useStackedDeckFeature.js";
@@ -226,6 +227,7 @@ function GenericRunDetail({
   const requirements = run.items.filter((item) => item.role === "requirement" && item.amount > 0);
   const rewards = run.items.filter((item) => item.role === "reward" && item.amount > 0);
   const studyType = getStudyType(run);
+  const canReport = canReportRun(run);
 
   return (
     <article className="panel run-reading-desk generic-run-detail" aria-label={`Reading ${run.title}`}>
@@ -261,12 +263,16 @@ function GenericRunDetail({
         <button type="button" onClick={() => { research.openRun(run); onEdit(); }}>
           <Pencil size={16} /> {run.lifecycle === "archived" ? "Restore and edit" : "Edit"}
         </button>
-        <button type="button" onClick={() => void research.copyDraft(run)}>
-          <ClipboardCopy size={16} /> Copy draft
-        </button>
-        <button type="button" onClick={() => void research.saveDraft(run)}>
-          <FileDown size={16} /> Save draft
-        </button>
+        {canReport ? (
+          <>
+            <button type="button" onClick={() => void research.copyDraft(run)}>
+              <ClipboardCopy size={16} /> Copy draft
+            </button>
+            <button type="button" onClick={() => void research.saveDraft(run)}>
+              <FileDown size={16} /> Save draft
+            </button>
+          </>
+        ) : null}
         {run.lifecycle !== "archived" ? (
           <button type="button" onClick={() => void research.archiveSavedRun(run)}>
             <Archive size={16} /> Archive

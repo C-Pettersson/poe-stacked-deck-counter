@@ -1,8 +1,8 @@
 import { Bell, ExternalLink, FolderOpen, LoaderCircle, RefreshCw, Trash2, Volume2 } from "lucide-react";
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import { formatDateTime } from "../../shared/format.js";
 import { LEAGUE_SOURCE_URL, getLeagueById } from "../../shared/leagues.js";
-import type { AppInfo, AppUpdateInfo, PriceSnapshot, Settings } from "../../shared/types.js";
+import type { AppInfo, AppUpdateInfo, NotificationTestResult, PriceSnapshot, Settings } from "../../shared/types.js";
 import { ENCOUNTER_DEFINITIONS } from "../../features/events/encounterCatalog.js";
 
 export function SettingsTab(props: {
@@ -17,6 +17,7 @@ export function SettingsTab(props: {
   onClearPriceCache: () => void;
   onChooseLog: () => void;
   onOpen: (url: string) => void;
+  onTestNotification: () => Promise<NotificationTestResult>;
   onAutoScanChange: (enabled: boolean) => void;
   onEncounterNotificationsChange: (settings: Settings["encounterNotifications"]) => void;
   onFixedStackedDeckPriceChange: (fixedStackedDeckPriceChaos: Settings["fixedStackedDeckPriceChaos"]) => void;
@@ -24,6 +25,10 @@ export function SettingsTab(props: {
   onPriceSourcePriorityChange: (priceSourcePriority: Settings["priceSourcePriority"]) => void;
   onProfitFiltersChange: (profitFilters: Settings["profitFilters"]) => void;
 }): ReactElement {
+  const [notificationTestState, setNotificationTestState] = useState<
+    "idle" | "sending" | "sent" | "unsupported" | "failed"
+  >("idle");
+  const [notificationTestMessage, setNotificationTestMessage] = useState<string | null>(null);
   const selectedLeague = getLeagueById(props.settings.selectedLeagueId);
   const snapshot = props.priceSnapshots[props.settings.selectedLeagueId];
   const filters = props.settings.profitFilters;
@@ -71,6 +76,19 @@ export function SettingsTab(props: {
     });
   }
 
+  async function testNotification(): Promise<void> {
+    setNotificationTestState("sending");
+    setNotificationTestMessage(null);
+    try {
+      const result = await props.onTestNotification();
+      setNotificationTestState(result.status === "shown" ? "sent" : result.status);
+      setNotificationTestMessage(result.message ?? null);
+    } catch {
+      setNotificationTestState("failed");
+      setNotificationTestMessage("The app could not request a test notification.");
+    }
+  }
+
   return (
     <section className="settings-grid">
       <article className="settings-card">
@@ -95,16 +113,32 @@ export function SettingsTab(props: {
             <h2>Encounter Notifications</h2>
             <p>Choose when each automatic encounter may notify and whether it can make sound. Requires Automatic scanning.</p>
           </div>
-          <label className="notification-master-toggle">
-            <Bell size={18} aria-hidden="true" />
-            <span>Notifications enabled</span>
-            <input
-              type="checkbox"
-              checked={props.settings.encounterNotifications.enabled}
-              onChange={(event) => updateNotificationSettings({ enabled: event.target.checked })}
-            />
-          </label>
+          <div className="notification-heading-actions">
+            <button
+              aria-busy={notificationTestState === "sending"}
+              type="button"
+              onClick={() => void testNotification()}
+              disabled={notificationTestState === "sending"}
+              title="Send a native test notification with sound"
+            >
+              <Bell size={18} aria-hidden="true" />
+              <span aria-live="polite">{notificationTestLabel(notificationTestState)}</span>
+            </button>
+            <label className="notification-master-toggle">
+              <Bell size={18} aria-hidden="true" />
+              <span>Notifications enabled</span>
+              <input
+                type="checkbox"
+                checked={props.settings.encounterNotifications.enabled}
+                onChange={(event) => updateNotificationSettings({ enabled: event.target.checked })}
+              />
+            </label>
+          </div>
         </div>
+
+        {notificationTestMessage ? (
+          <p className="notification-test-status" role="status">{notificationTestMessage}</p>
+        ) : null}
 
         <fieldset className="notification-trigger-settings" disabled={!props.settings.encounterNotifications.enabled}>
           <legend>Notify when</legend>
@@ -342,4 +376,19 @@ function parseOptionalChaosInput(value: string): number | null {
 
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function notificationTestLabel(state: "idle" | "sending" | "sent" | "unsupported" | "failed"): string {
+  switch (state) {
+    case "sending":
+      return "Sending...";
+    case "sent":
+      return "Test Sent";
+    case "unsupported":
+      return "Not Available";
+    case "failed":
+      return "Try Again";
+    default:
+      return "Test Notification";
+  }
 }

@@ -55,6 +55,12 @@
       "dist/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "src/renderer/assets/wraeclast-field-notes.png",
+        "to": "wraeclast-field-notes.png"
+      }
+    ],
     "win": {
       "icon": "src/renderer/assets/wraeclast-field-notes.png",
       "signExecutable": false,

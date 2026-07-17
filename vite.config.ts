@@ -20,7 +20,8 @@ export default defineConfig({
   plugins: [react(), browserPreviewApi()],
   build: {
     outDir: "dist/renderer",
-    emptyOutDir: true
+    emptyOutDir: true,
+    chunkSizeWarningLimit: 2_100
   },
   server: {
     port: 5173,

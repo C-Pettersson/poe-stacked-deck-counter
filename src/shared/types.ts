@@ -168,6 +168,11 @@ export interface AppUpdateInfo {
   updateAvailable: boolean;
 }
 
+export interface NotificationTestResult {
+  status: "shown" | "unsupported" | "failed";
+  message?: string;
+}
+
 export interface Settings {
   logPath: string;
   selectedLeagueId: string;

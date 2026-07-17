@@ -16,6 +16,7 @@ import {
   Plus
 } from "lucide-react";
 import { useMemo, useState, type ReactElement } from "react";
+import { canReportRun } from "../../application/codexDraft.js";
 import type { ItemGameData, RunItemRole } from "../../domain/collection.js";
 import type { useResearchRuns } from "../app/useResearchRuns.js";
 import { describeCatalogItemSearchResults } from "../catalogItemMetadata.js";
@@ -172,6 +173,7 @@ function ActiveRunWorkspace({
 }): ReactElement {
   const run = research.activeRun!;
   const isDetectedEncounter = run.origin === "detector" && run.template?.name.startsWith("client-log-");
+  const canReport = canReportRun(run);
   const describedItemSearchResults = describeCatalogItemSearchResults(research.itemSearchResults);
 
   return (
@@ -186,12 +188,16 @@ function ActiveRunWorkspace({
         ) : (
           <button type="button" onClick={research.beginActiveRun}><Play size={18} /> Start timer</button>
         )}
-        <button type="button" onClick={() => void research.saveDraft()}>
-          <FileDown size={18} /> Save draft
-        </button>
-        <button className="primary-button" type="button" onClick={() => void research.copyDraft()}>
-          <ClipboardCopy size={18} /> Copy Codex draft
-        </button>
+        {canReport ? (
+          <>
+            <button type="button" onClick={() => void research.saveDraft()}>
+              <FileDown size={18} /> Save draft
+            </button>
+            <button className="primary-button" type="button" onClick={() => void research.copyDraft()}>
+              <ClipboardCopy size={18} /> Copy Codex draft
+            </button>
+          </>
+        ) : null}
       </div>
 
       <div className="panel active-study-header">
@@ -199,6 +205,7 @@ function ActiveRunWorkspace({
           <span className="eyebrow">{isDetectedEncounter ? "Encounter detected from Client.txt" : (run.template?.categoryName ?? "Custom field study")}</span>
           <h2>{isDetectedEncounter ? `Log loot: ${run.title.replace(/ drops$/i, "")}` : run.title}</h2>
           <p>{run.template?.description ?? "Locally collected research notes ready for Codex handoff."}</p>
+          {!canReport ? <p>Fixed-result strategies are local notes only and cannot be reported to poe.how.</p> : null}
           {isDetectedEncounter ? (
             <div className="encounter-reference-actions">
               {run.template?.wikiUrl ? (
@@ -424,40 +431,40 @@ function RunItemGroup({ title, role, research }: { title: string; role: RunItemR
       <div className="run-item-list">
         {items.length === 0 ? <p className="muted-copy">No items recorded.</p> : null}
         {items.map((item) => (
-        <div className="run-item-row" key={item.id}>
-          <div>
-            <ItemHover
-              className="run-item-hover-trigger"
-              data={createResearchItemHoverData({
-                name: item.name,
-                category: item.itemType ?? item.category ?? (item.role === "requirement" ? "Requirement" : "Reward"),
-                baseType: item.baseType,
-                icon: item.icon,
-                detailsId: item.detailsId,
-                amount: item.amount,
-                gameData: item.gameData,
-                quote: research.marketQuotes[item.detailsId],
-                provenance: item.provenance
-              })}
-            >
-              <strong>{item.name}</strong>
-            </ItemHover>
-            <span>
-              {item.provenance} · {formatItemValue(item.amount, item.priceOverrideChaos, research.marketQuotes[item.detailsId])}
-            </span>
+          <div className="run-item-row" key={item.id}>
+            <div>
+              <ItemHover
+                className="run-item-hover-trigger"
+                data={createResearchItemHoverData({
+                  name: item.name,
+                  category: item.itemType ?? item.category ?? (item.role === "requirement" ? "Requirement" : "Reward"),
+                  baseType: item.baseType,
+                  icon: item.icon,
+                  detailsId: item.detailsId,
+                  amount: item.amount,
+                  gameData: item.gameData,
+                  quote: research.marketQuotes[item.detailsId],
+                  provenance: item.provenance
+                })}
+              >
+                <strong>{item.name}</strong>
+              </ItemHover>
+              <span>
+                {item.provenance} · {formatItemValue(item.amount, item.priceOverrideChaos, research.marketQuotes[item.detailsId])}
+              </span>
+            </div>
+            <input
+              aria-label={`${item.name} amount`}
+              type="number"
+              min={0}
+              step="any"
+              value={item.amount}
+              onChange={(event) => research.changeItemAmount(item.id, Number(event.target.value))}
+            />
+            <button aria-label={`Remove ${item.name}`} type="button" onClick={() => research.deleteItem(item.id)}>
+              <Trash2 size={16} />
+            </button>
           </div>
-          <input
-            aria-label={`${item.name} amount`}
-            type="number"
-            min={0}
-            step="any"
-            value={item.amount}
-            onChange={(event) => research.changeItemAmount(item.id, Number(event.target.value))}
-          />
-          <button aria-label={`Remove ${item.name}`} type="button" onClick={() => research.deleteItem(item.id)}>
-            <Trash2 size={16} />
-          </button>
-        </div>
         ))}
       </div>
     </section>

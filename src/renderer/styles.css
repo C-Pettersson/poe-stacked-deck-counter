@@ -849,6 +849,19 @@ td.table-empty {
   margin-top: 5px;
 }
 
+.notification-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.notification-test-status {
+  margin: 0;
+  font-size: 12px;
+}
+
 .notification-master-toggle {
   min-height: 42px;
   padding: 0 12px;
@@ -2116,7 +2129,7 @@ h3 {
   position: relative;
   min-height: calc(100vh - 94px);
   padding: 14px;
-  overflow: hidden;
+  overflow: clip;
   border: 1px solid #4d3e2a;
   border-top: 0;
   color: var(--ink);
